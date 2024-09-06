@@ -20,6 +20,9 @@ function MainFrame:OnEvent(event, arg1, arg2, arg3, arg4, arg5)
         WhoGotLootsSavedData = WhoGotLootsSavedData or {}
         WhoLootsOptionsEntries.LoadOptions()
 
+        if WhoGotLootsSavedData.FirstBoot == false then MainFrame:Hide() end
+        WhoGotLootsSavedData.FirstBoot = false
+
         -- Set window scale.
         WhoLootData.MainFrame:SetScale(WhoGotLootsSavedData.SavedSize)
 
@@ -51,21 +54,6 @@ local function getGearItemLvl(slotName)
         end
     end
     return format("%s", lvl)
-end
-
--- Find which is the highest stat between agility, strength, and intellect.
-local function getHighestStat(mainStat)
-    local highestStat = 0
-    local highestStatName = ""
-    for stat, value in pairs(mainStat) do
-        if stat == "ITEM_MOD_AGILITY_SHORT" or stat == "ITEM_MOD_STRENGTH_SHORT" or stat == "ITEM_MOD_INTELLECT_SHORT" then
-            if value > highestStat then
-                highestStat = value
-                highestStatName = stat
-            end
-        end
-    end
-    return highestStatName
 end
 
 local function GetItemSlotName(itemLink)
@@ -131,6 +119,11 @@ function AddLootFrame(player, itemLink)
         local efectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemLink)
         local itemName, linkedItem, itemQuality, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expansionID, setID, isCraftingReagent = C_Item.GetItemInfo(itemLink)
 
+        -- If itemLink was a number, we need to get the itemLink from the Item object.
+        if type(itemLink) == "number" then
+            itemLink = linkedItem
+        end
+
         local CanEquip = C_Item.DoesItemContainSpec(CompareItemID, select(3, UnitClass("player")))
         if not CanEquip and WhoGotLootsSavedData.HideUnequippable then
             return
@@ -187,13 +180,13 @@ function AddLootFrame(player, itemLink)
         -- Compare Against the item we have in the same slot.
         local slotID = GetInventorySlotInfo(GetItemSlotName(itemLink))
         local CurrentItemLink = GetInventoryItemLink("player", slotID)
-        local CurrentItem, ItemType, IsNotArmor
+        local CurrentItem, IsNotArmor
 
         local BottomText = {}
 
+        -- Check if this is an armor piece.
         if CurrentItemLink then 
-            ItemType = select(6, GetItemInfo(CurrentItemLink))
-            IsNotArmor = ItemType == "Trinket" and ItemType == "Ring" and ItemType == "Weapon" and ItemType == "Neck" and ItemType == "Cloak"
+            IsNotArmor = ItemType == "Trinket" or ItemType == "Ring" or ItemType == "Weapon" or ItemType == "Neck" or ItemType == "Cloak"
         end
 
         -- If we can equip this item, check if it's an upgrade.
@@ -205,7 +198,7 @@ function AddLootFrame(player, itemLink)
 
             local ourIlvl = 0
 
-            -- If this is a trinket, find the highest ilvl trinket we have.
+            -- If this is a trinket, find the lowest ilvl trinket we have.
             if itemEquipLoc == "INVTYPE_TRINKET" then
                 local trinket1 = GetInventoryItemLink("player", 13)
                 local trinket2 = GetInventoryItemLink("player", 14)
@@ -217,9 +210,9 @@ function AddLootFrame(player, itemLink)
                 if trinket2 then
                     trinket2Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(14))
                 end
-                ourIlvl = math.max(trinket1Ilvl, trinket2Ilvl)
+                ourIlvl = math.min(trinket1Ilvl, trinket2Ilvl)
 
-            -- If this is a ring, we need to check both rings.
+            -- Same for ring
             elseif itemEquipLoc == "INVTYPE_FINGER" then
                 local ring1 = GetInventoryItemLink("player", 11)
                 local ring2 = GetInventoryItemLink("player", 12)
@@ -231,7 +224,7 @@ function AddLootFrame(player, itemLink)
                 if ring2 then
                     ring2Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(12))
                 end
-                ourIlvl = math.max(ring1Ilvl, ring2Ilvl)
+                ourIlvl = math.min(ring1Ilvl, ring2Ilvl)
 
             -- Normal comparison.
             else
@@ -240,55 +233,52 @@ function AddLootFrame(player, itemLink)
                 end
             end
 
+            -- Show the ilvl diff if any
             local ilvlDiff = efectiveIlvl - ourIlvl
-            local diffText = ""
             if ilvlDiff > 0 then
-                diffText = "|cFF00FF00+" .. ilvlDiff .. "|r"
-            elseif ilvlDiff < 0 then
-                diffText = "|cFFFF0000" .. ilvlDiff .. "|r"
+                table.insert(BottomText, "|cFF00FF00+" .. ilvlDiff .. "|r ilvl")
+            else
+                table.insert(BottomText, "|cFFFF0000" .. ilvlDiff .. "|r ilvl")
             end
 
-            -- ADD ITEM LEVEL
-            table.insert(BottomText, diffText .. "|r ilvl")
-            
             -- Figure out the main stat difference.
-            if itemEquipLoc ~= "INVTYPE_TRINKET" and itemEquipLoc ~= "INVTYPE_NECK" and itemEquipLoc ~= "INVTYPE_FINGER" then
+            if itemEquipLoc ~= "INVTYPE_NECK" and itemEquipLoc ~= "INVTYPE_FINGER" then
 
                 -- Get the main stat of the item we're comparing to.
-                local compareItemMainStat = C_Item.GetItemStats(linkedItem)
-                if compareItemMainStat ~= nil then
+                local CompareItemStats = C_Item.GetItemStats(itemLink)
+
+                if CompareItemStats ~= nil then
+
+                    -- First, figure out which stat is relevant to us. Get the player's main stats, and find the highest one.
+                    local PlayerTopStat = WhoGotLootUtil.GetPlayerMainStat()
                     
                     -- Now, get the main stat of our currently equipped item.
-                    local highestStatName = getHighestStat(compareItemMainStat)
+                    local CompareItemMainStat = WhoGotLootUtil.GetItemMainStat(CompareItemStats, PlayerTopStat)
 
-                    diffStat = compareItemMainStat[highestStatName]
-
-                    -- Get the main stat of our currently equipped item.
-                    local ourItemMainStat = 0
-                    local ourHighestStatName = ""
-
+                    -- If we have an item equipped in the same slot, compare the main stats.
+                    local diffStat = 0
                     if CurrentItemLink then
-                        ourItemMainStat = C_Item.GetItemStats(CurrentItemLink)
-                        ourHighestStatName = getHighestStat(ourItemMainStat)
+                        ourItemMainStat = WhoGotLootUtil.GetItemMainStat(C_Item.GetItemStats(CurrentItemLink), PlayerTopStat)
 
-                        -- Now get the difference between the two.
-                        diffStat = compareItemMainStat[highestStatName] - ourItemMainStat[ourHighestStatName]
-                    end
-
-                    -- The stat names look like "ITEM_MOD_AGILITY_SHORT", so we need to strip the "ITEM_MOD_" and "_SHORT" parts.
-                    highestStatName = highestStatName:gsub("ITEM_MOD_", ""):gsub("_SHORT", "")
-
-                    -- Make the stat name look nice.
-                    if highestStatName == "AGILITY" then
-                        highestStatName = "Agility"
-                    elseif highestStatName == "STRENGTH" then
-                        highestStatName = "Strength"
-                    elseif highestStatName == "INTELLECT" then
-                        highestStatName = "Intellect"
+                        if CompareItemMainStat ~= nil then
+                            diffStat = CompareItemMainStat - ourItemMainStat
+                        elseif ourItemMainStat ~= nil then
+                            diffStat = -ourItemMainStat
+                        else
+                            diffStat = 0
+                        end
                     end
 
                     -- Create a text showing the difference in main stat.
-                    table.insert(BottomText, "+|c" .. (diffStat > 0 and "ff00ff00" or "ffff0000") .. diffStat .. "|r " .. highestStatName)
+                    if diffStat ~= 0 then
+                        local diffStatText = ""
+                        if diffStat > 0 then
+                            diffStatText = "|cFF00FF00+" .. diffStat .. "|r"
+                        elseif diffStat < 0 then
+                            diffStatText = "|cFFFF0000" .. diffStat .. "|r"
+                        end
+                        table.insert(BottomText, diffStatText .. " " .. PlayerTopStat)
+                    end
                 end
             end
         end
@@ -310,7 +300,7 @@ function AddLootFrame(player, itemLink)
         -- Register a mouseover to show the item tooltip.
         newframe:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetHyperlink(linkedItem)
+            GameTooltip:SetHyperlink(itemLink)
             GameTooltip:Show()
             self:SetBackdropColor(0.4, 0.4, 0.4, 1)
         end)
