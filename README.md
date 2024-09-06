@@ -1,1 +1,1 @@
-Just a simple little addon that helps faciliate sharing loot between party and raid members.
+Just a simple little addon that helps facilitate sharing loot between party and raid members.
