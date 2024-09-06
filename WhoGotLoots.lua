@@ -43,7 +43,6 @@ local function getGearItemLvl(slotName)
     local lvl = 0
     if (slotName ~= nil) then
         local slotID, texture, checkRelic = GetInventorySlotInfo(slotName)
-        --print("getGearItemLvl    " .. slotID .. "     " .. texture .. "     " .. tostring(checkRelic))
         if (slotID ~= nil) then
             local itemLocation = ItemLocation:CreateFromEquipmentSlot(slotID)
             if C_Item.DoesItemExist(itemLocation) then
@@ -51,7 +50,6 @@ local function getGearItemLvl(slotName)
             end
         end
     end
-    --print("getGearItemLvl("..slotName..") " .. "  slotID: " .. slotID .. "  itemlevel: " .. lvl)
     return format("%s", lvl)
 end
 
@@ -350,7 +348,6 @@ function AddLootFrame(player, itemLink)
         ResortFrames()
 
         -- Play a sound
-        print(WhoGotLootsSavedData.SoundEnabled)
         if WhoGotLootsSavedData.SoundEnabled == true or WhoGotLootsSavedData.SoundEnabled == nil then
             PlaySound(145739)
         end
@@ -506,7 +503,6 @@ optionsBtn:SetScript("OnClick", function(self)
         local MainFrameX, MainFrameY = MainFrame:GetCenter()
 
         if MainFrameX - optionsFrameWidth * MainFrame:GetScale() < 0 then
-            print("We dont havee enough room to slide to the left.")
             WhichPoint = "TOPLEFT"
         end
 
@@ -563,14 +559,6 @@ SlashCmdList["WHOLOOT"] = function(msg, editbox)
             AddLootFrame("Andisae", itemID)
         else
             print("Invalid item ID.")
-        end
-    elseif msg:sub(1, 5) == "scale" then
-        local scale = tonumber(msg:sub(7))
-        if scale then
-            MainFrame:SetScale(scale)
-            WhoGotLootsSavedData.SavedSize = scale
-        else
-            print("Invalid scale.")
         end
     else
         print("Unknown command. Use '/wholoot toggle' or '/wholoot debug'.")
