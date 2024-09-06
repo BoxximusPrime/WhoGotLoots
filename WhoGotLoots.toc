@@ -1,0 +1,10 @@
+## Interface: 110002
+
+## Title: Who Got Loots
+## Notes: Tracks and displays looted items
+
+## SavedVariables: WhoGotLootsSavedData
+
+util.lua
+WhoGotLoots.lua
+OptionsMenu.lua
