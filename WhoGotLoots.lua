@@ -4,30 +4,33 @@ WhoLootData.ChildFrames = {} -- Contains sub tables with each frame, progress ba
 WhoLootData.DefaultDuration = 60 -- Default duration for each frame to be visible.
 
 MainFrame = CreateFrame("Frame", nil, nil, "BackdropTemplate")
+MainFrame.name = "WhoLoots"
 MainFrame:SetParent(UIParent)
-
+MainFrame:SetDontSavePosition(true)
 WhoLootData.MainFrame = MainFrame
 
 -- Register Events --
 MainFrame:RegisterEvent("ADDON_LOADED"); -- Fired when saved variables are loaded
-MainFrame:RegisterEvent("PLAYER_LOGOUT"); -- Fired when about to log out
 MainFrame:RegisterEvent("ENCOUNTER_LOOT_RECEIVED")
 
 -- Handle Events --
 function MainFrame:OnEvent(event, arg1, arg2, arg3, arg4, arg5)
     if event == "ADDON_LOADED" and arg1 == "WhoGotLoots" then
 
+        WhoGotLootsSavedData = WhoGotLootsSavedData or {}
         WhoLootsOptionsEntries.LoadOptions()
-
-        -- Set window position (we do this after loading the options, because the saved position is loaded in LoadOptions)
-        if WhoGotLootsSavedData.SavedPos then
-            WhoLootData.MainFrame:SetPoint(unpack(WhoGotLootsSavedData.SavedPos))
-        else
-            WhoLootData.MainFrame:SetPoint("CENTER")
-        end
 
         -- Set window scale.
         WhoLootData.MainFrame:SetScale(WhoGotLootsSavedData.SavedSize)
+
+        -- Set window position (we do this after loading the options, because the saved position is loaded in LoadOptions)
+        if WhoGotLootsSavedData.SavedPos then
+            WhoLootData.MainFrame:ClearAllPoints()
+            WhoLootData.MainFrame:SetPoint(unpack(WhoGotLootsSavedData.SavedPos))
+        else
+            WhoLootData.MainFrame:ClearAllPoints()
+            WhoLootData.MainFrame:SetPoint("CENTER", nil, "CENTER")
+        end
 
     elseif event == "ENCOUNTER_LOOT_RECEIVED" then
         local itemLink = arg3
@@ -183,141 +186,128 @@ function AddLootFrame(player, itemLink)
         itemText:SetText("|c" .. select(4, GetItemQualityColor(CompareItem:GetItemQuality())) .. "[" .. itemName  .. "]" .. "|r")
         itemText:SetParent(newframe)
 
+        -- Compare Against the item we have in the same slot.
         local slotID = GetInventorySlotInfo(GetItemSlotName(itemLink))
         local CurrentItemLink = GetInventoryItemLink("player", slotID)
-        local MyCurrentItemID = C_Item.GetItemIDForItemInfo(CurrentItemLink)
-        local CurrentItem = Item:CreateFromItemID(MyCurrentItemID)
+        local CurrentItem, ItemType, IsNotArmor
 
-        CurrentItem:ContinueOnItemLoad(function()
+        local BottomText = {}
 
-            local BottomText = {}
+        if CurrentItemLink then 
+            ItemType = select(6, GetItemInfo(CurrentItemLink))
+            IsNotArmor = ItemType == "Trinket" and ItemType == "Ring" and ItemType == "Weapon" and ItemType == "Neck" and ItemType == "Cloak"
+        end
 
-            local ItemType = select(6, GetItemInfo(CurrentItemLink))
-            local IsNotArmor = ItemType == "Trinket" and ItemType == "Ring" and ItemType == "Weapon" and ItemType == "Neck" and ItemType == "Cloak"
-
-            local MatchesArmorType = true
-            if not IsNotArmor then
-                local ourArmorType = select(7, GetItemInfo(CurrentItemLink))
-                MatchesArmorType = ourArmorType == itemSubType
+        -- If we can equip this item, check if it's an upgrade.
+        if CanEquip then
+            -- Next, check if we're at the minimum character level.
+            if UnitLevel("player") < itemMinLevel then
+                table.insert(BottomText, "|cFFFF0000Level " .. itemMinLevel .. "|r")
             end
 
-            -- Determine if we can equip the item.
-            -- This is kinda hackish, but get the tooltip and check for red text.
-            -- local tooltip = CreateFrame("GameTooltip", "WhoLootTooltip", nil, "GameTooltipTemplate")
-            -- tooltip:SetOwner(UIParent, "ANCHOR_NONE")
-            -- --tooltip:SetHyperlink(linkedItem)
-            -- tooltip:SetItemByID(CompareItemID)
-            -- for i = 1, tooltip:NumLines() do
-            --     local r, g, b = _G["WhoLootTooltipTextRight" .. i]:GetTextColor()
-            --     -- If the text is mostly red, we can't equip it.
-            --     if r > 0.9 and g < 0.2 and b < 0.2 then
-            --         CanEquip = false
-            --         break
-            --     end
-            -- end
+            local ourIlvl = 0
 
-            -- If we can equip this item, check if it's an upgrade.
-            if CanEquip then
-                -- Next, check if we're at the minimum character level.
-                if UnitLevel("player") < itemMinLevel then
-                    table.insert(BottomText, "|cFFFF0000Level " .. itemMinLevel .. "|r")
+            -- If this is a trinket, find the highest ilvl trinket we have.
+            if itemEquipLoc == "INVTYPE_TRINKET" then
+                local trinket1 = GetInventoryItemLink("player", 13)
+                local trinket2 = GetInventoryItemLink("player", 14)
+                local trinket1Ilvl = 0
+                local trinket2Ilvl = 0
+                if trinket1 then
+                    trinket1Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(13))
                 end
+                if trinket2 then
+                    trinket2Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(14))
+                end
+                ourIlvl = math.max(trinket1Ilvl, trinket2Ilvl)
 
-                local ourIlvl = 0
+            -- If this is a ring, we need to check both rings.
+            elseif itemEquipLoc == "INVTYPE_FINGER" then
+                local ring1 = GetInventoryItemLink("player", 11)
+                local ring2 = GetInventoryItemLink("player", 12)
+                local ring1Ilvl = 0
+                local ring2Ilvl = 0
+                if ring1 then
+                    ring1Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(11))
+                end
+                if ring2 then
+                    ring2Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(12))
+                end
+                ourIlvl = math.max(ring1Ilvl, ring2Ilvl)
 
-                -- If this is a trinket, find the highest ilvl trinket we have.
-                if itemEquipLoc == "INVTYPE_TRINKET" then
-                    local trinket1 = GetInventoryItemLink("player", 13)
-                    local trinket2 = GetInventoryItemLink("player", 14)
-                    local trinket1Ilvl = 0
-                    local trinket2Ilvl = 0
-                    if trinket1 then
-                        trinket1Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(13))
-                    end
-                    if trinket2 then
-                        trinket2Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(14))
-                    end
-                    ourIlvl = math.max(trinket1Ilvl, trinket2Ilvl)
-
-                -- If this is a ring, we need to check both rings.
-                elseif itemEquipLoc == "INVTYPE_FINGER" then
-                    local ring1 = GetInventoryItemLink("player", 11)
-                    local ring2 = GetInventoryItemLink("player", 12)
-                    local ring1Ilvl = 0
-                    local ring2Ilvl = 0
-                    if ring1 then
-                        ring1Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(11))
-                    end
-                    if ring2 then
-                        ring2Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(12))
-                    end
-                    ourIlvl = math.max(ring1Ilvl, ring2Ilvl)
-
-                -- Normal comparison.
-                else
+            -- Normal comparison.
+            else
+                if CurrentItemLink then
                     ourIlvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(slotID))
                 end
+            end
 
-                local ilvlDiff = efectiveIlvl - ourIlvl
-                local diffText = ""
-                if ilvlDiff > 0 then
-                    diffText = "|cFF00FF00+" .. ilvlDiff .. "|r"
-                elseif ilvlDiff < 0 then
-                    diffText = "|cFFFF0000" .. ilvlDiff .. "|r"
-                end
+            local ilvlDiff = efectiveIlvl - ourIlvl
+            local diffText = ""
+            if ilvlDiff > 0 then
+                diffText = "|cFF00FF00+" .. ilvlDiff .. "|r"
+            elseif ilvlDiff < 0 then
+                diffText = "|cFFFF0000" .. ilvlDiff .. "|r"
+            end
 
-                -- ADD ITEM LEVEL
-                table.insert(BottomText, diffText .. "|r ilvl")
-                
-                -- Figure out the main stat difference.
-                if itemEquipLoc ~= "INVTYPE_TRINKET" and itemEquipLoc ~= "INVTYPE_NECK" and itemEquipLoc ~= "INVTYPE_FINGER" then
+            -- ADD ITEM LEVEL
+            table.insert(BottomText, diffText .. "|r ilvl")
+            
+            -- Figure out the main stat difference.
+            if itemEquipLoc ~= "INVTYPE_TRINKET" and itemEquipLoc ~= "INVTYPE_NECK" and itemEquipLoc ~= "INVTYPE_FINGER" then
 
-                    -- Get the main stat of the item we're comparing to.
-                    local compareItemMainStat = C_Item.GetItemStats(linkedItem)
-                    if compareItemMainStat ~= nil then
-                        
-                        -- Now, get the main stat of our currently equipped item.
-                        local highestStatName = getHighestStat(compareItemMainStat)
+                -- Get the main stat of the item we're comparing to.
+                local compareItemMainStat = C_Item.GetItemStats(linkedItem)
+                if compareItemMainStat ~= nil then
+                    
+                    -- Now, get the main stat of our currently equipped item.
+                    local highestStatName = getHighestStat(compareItemMainStat)
 
-                        -- Get the main stat of our currently equipped item.
-                        local ourItemMainStat = C_Item.GetItemStats(CurrentItemLink)
-                        local ourHighestStatName = getHighestStat(ourItemMainStat)
+                    diffStat = compareItemMainStat[highestStatName]
+
+                    -- Get the main stat of our currently equipped item.
+                    local ourItemMainStat = 0
+                    local ourHighestStatName = ""
+
+                    if CurrentItemLink then
+                        ourItemMainStat = C_Item.GetItemStats(CurrentItemLink)
+                        ourHighestStatName = getHighestStat(ourItemMainStat)
 
                         -- Now get the difference between the two.
-                        local diffStat = compareItemMainStat[highestStatName] - ourItemMainStat[ourHighestStatName]
-
-                        -- The stat names look like "ITEM_MOD_AGILITY_SHORT", so we need to strip the "ITEM_MOD_" and "_SHORT" parts.
-                        highestStatName = highestStatName:gsub("ITEM_MOD_", ""):gsub("_SHORT", "")
-
-                        -- Make the stat name look nice.
-                        if highestStatName == "AGILITY" then
-                            highestStatName = "Agility"
-                        elseif highestStatName == "STRENGTH" then
-                            highestStatName = "Strength"
-                        elseif highestStatName == "INTELLECT" then
-                            highestStatName = "Intellect"
-                        end
-
-                        -- Create a text showing the difference in main stat.
-                        table.insert(BottomText, "+|c" .. (diffStat > 0 and "ff00ff00" or "ffff0000") .. diffStat .. "|r " .. highestStatName)
+                        diffStat = compareItemMainStat[highestStatName] - ourItemMainStat[ourHighestStatName]
                     end
+
+                    -- The stat names look like "ITEM_MOD_AGILITY_SHORT", so we need to strip the "ITEM_MOD_" and "_SHORT" parts.
+                    highestStatName = highestStatName:gsub("ITEM_MOD_", ""):gsub("_SHORT", "")
+
+                    -- Make the stat name look nice.
+                    if highestStatName == "AGILITY" then
+                        highestStatName = "Agility"
+                    elseif highestStatName == "STRENGTH" then
+                        highestStatName = "Strength"
+                    elseif highestStatName == "INTELLECT" then
+                        highestStatName = "Intellect"
+                    end
+
+                    -- Create a text showing the difference in main stat.
+                    table.insert(BottomText, "+|c" .. (diffStat > 0 and "ff00ff00" or "ffff0000") .. diffStat .. "|r " .. highestStatName)
                 end
             end
+        end
 
-            if not CanEquip then
-                if WhoGotLootUtil.IsArmorPiece(itemEquipLoc) then
-                    table.insert(BottomText, "|cffff0000" .. itemSubType .. "|r")
-                else
-                    table.insert(BottomText, "|cffff0000" .. _G[itemEquipLoc] .. "|r")
-                end
+        if not CanEquip then
+            if WhoGotLootUtil.IsArmorPiece(itemEquipLoc) then
+                table.insert(BottomText, "|cffff0000" .. itemSubType .. "|r")
+            else
+                table.insert(BottomText, "|cffff0000" .. _G[itemEquipLoc] .. "|r")
             end
+        end
 
-            BottomTextFrame = newframe:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            BottomTextFrame:SetFont("Fonts\\FRIZQT__.TTF", 8, "")
-            BottomTextFrame:SetPoint("TOPLEFT", itemText, "BOTTOMLEFT", 0, -2)
-            BottomTextFrame:SetText(table.concat(BottomText, "  "))
-            BottomTextFrame:SetParent(newframe)
-        end)
+        BottomTextFrame = newframe:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        BottomTextFrame:SetFont("Fonts\\FRIZQT__.TTF", 8, "")
+        BottomTextFrame:SetPoint("TOPLEFT", itemText, "BOTTOMLEFT", 0, -2)
+        BottomTextFrame:SetText(table.concat(BottomText, "  "))
+        BottomTextFrame:SetParent(newframe)
 
         -- Register a mouseover to show the item tooltip.
         newframe:SetScript("OnEnter", function(self)
@@ -349,36 +339,31 @@ function AddLootFrame(player, itemLink)
             ResortFrames()
         end)
 
-        -- Store the frame in the ChildFrames table.
-        table.insert(WhoLootData.ChildFrames, {newframe, progressBar, WhoLootData.DefaultDuration})
-
-        -- Make it look nice.
-        local backdrop = {
-            bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-            edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-            edgeSize = 4,
-            insets = { left = 1, right = 1, top = 1, bottom = 1 },
-        }
-
-        newframe:SetBackdrop(backdrop)
+        newframe:SetBackdrop(WhoGotLootUtil.Backdrop)
         newframe:SetBackdropBorderColor(0, 0, 0, 1) -- Set the border color (RGBA)
-
         newframe:SetParent(MainFrame)
         AnimateFrameScale(newframe, 1.0, 0.2)
+
+        -- Store the frame in the ChildFrames table.
+        table.insert(WhoLootData.ChildFrames, {newframe, progressBar, WhoLootData.DefaultDuration})
 
         ResortFrames()
 
         -- Play a sound
-        print(WhoLootsOptionsEntries.SoundEnabled)
-        if WhoLootsOptionsEntries.SoundEnabled == true then PlaySound(145739) end
+        print(WhoGotLootsSavedData.SoundEnabled)
+        if WhoGotLootsSavedData.SoundEnabled == true or WhoGotLootsSavedData.SoundEnabled == nil then
+            PlaySound(145739)
+        end
     end)
 end
 
 -- Function to resort the frames, if we remove one.
 function ResortFrames()
+
     -- Loop through all the frames, and set their position starting at the top of the mainwindowbg.
     local numFrames = #WhoLootData.ChildFrames
     for frame in pairs(WhoLootData.ChildFrames) do
+        WhoLootData.ChildFrames[frame][1]:ClearAllPoints()
         WhoLootData.ChildFrames[frame][1]:SetPoint("TOPLEFT", 0, -20 - (frame - 1) * 34 - 5)
     end
 
@@ -449,17 +434,8 @@ function AnimateFrameScale(frame, targetScale, duration)
     end)
 end
 
-
-local backdrop = {
-    bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-    edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-    edgeSize = 4,
-    insets = { left = 1, right = 1, top = 1, bottom = 1 },
-}
-
 -- Create the parent frame
 MainFrame:SetSize(150, 25)
-MainFrame:SetPoint("CENTER")
 MainFrame:SetMovable(true)
 MainFrame:EnableMouse(true)
 MainFrame:RegisterForDrag("LeftButton")
@@ -473,15 +449,13 @@ MainFrame:SetScript("OnDragStop", function(self)
 end)
 
 -- Apply the backdrop to the frame
-MainFrame:SetBackdrop(backdrop)
+MainFrame:SetBackdrop(WhoGotLootUtil.Backdrop)
 MainFrame:SetBackdropColor(0.2, 0.2, 0.2, 1) -- Set the background color (RGBA)
 MainFrame:SetBackdropBorderColor(0, 0, 0, 1) -- Set the border color (RGBA)
 
 -- Make the frame highlight when hovered over
 MainFrame:SetScript("OnEnter", function(self)
-
     if WhoGotLootsSavedData.LockWindow then return end
-
     self:SetBackdropBorderColor(0.2, 0.2, 0.2, 1) -- Set the border color (RGBA)
     self:SetBackdropColor(0.4, 0.4, 0.4, 1)
 end)
@@ -491,16 +465,15 @@ MainFrame:SetScript("OnLeave", function(self)
     self:SetBackdropColor(0.2, 0.2, 0.2, 1)
 end)
 
--- Create the child frame
+-- Create the title text
 local text = MainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 text:SetPoint("LEFT", 10, 0)
 text:SetJustifyH("LEFT")
 text:SetText("Who Got Loots")
 text:SetFont("Fonts\\FRIZQT__.TTF", 8, "")
--- change font color
-text:SetTextColor(1, 1, 1)
+    text:SetTextColor(1, 1, 1)
 
--- Ensure the child frame is properly anchored to the parent frame
+-- Ensure the title text is properly anchored to the parent frame
 text:SetParent(MainFrame)
 
 -- Add a button to close the window
@@ -523,13 +496,31 @@ optionsBtn:SetScript("OnClick", function(self)
         -- Fade in the options frame, and make it slide into view.
         WhoLootsOptionsFrame:Show()
         WhoLootsOptionsFrame:SetAlpha(0)
-        WhoLootsOptionsFrame:SetPoint("TOPLEFT", MainFrame, "TOPRIGHT", 26, 0)
+        WhoLootsOptionsFrame:ClearAllPoints()
+
+        -- Determine if we have enough space on the left side of the main frame.
+        local WhichPoint = "TOPRIGHT"
+        local frameWidth = MainFrame:GetWidth()
+        local optionsFrameWidth = WhoLootsOptionsFrame:GetWidth()
+        local screenWidth = GetScreenWidth()
+        local MainFrameX, MainFrameY = MainFrame:GetCenter()
+
+        if MainFrameX - optionsFrameWidth * MainFrame:GetScale() < 0 then
+            print("We dont havee enough room to slide to the left.")
+            WhichPoint = "TOPLEFT"
+        end
+
+        WhoLootsOptionsFrame:SetFrameStrata("HIGH")
         WhoLootsOptionsFrame:SetScript("OnUpdate", function(self, elapsed)
             local alpha = self:GetAlpha()
             if alpha < 1 then
                 local clamped = math.min(1, alpha + elapsed * 4)
                 self:SetAlpha(clamped)
-                self:SetPoint("TOPLEFT", MainFrame, "TOPRIGHT", (1 - clamped) * 26, 0)
+                if WhichPoint == "TOPRIGHT" then
+                    self:SetPoint(WhichPoint, MainFrame, "TOPLEFT", (1 - clamped) * -26, 0)
+                else
+                    self:SetPoint(WhichPoint, MainFrame, "TOPRIGHT", (1 - clamped) * 26, 0)
+                end
             else
                 self:SetScript("OnUpdate", nil)
             end
@@ -546,9 +537,6 @@ debug_addrandombtn:SetScript("OnClick", function(self)
     AddLootFrame("Andisae", 212407)
 end)
 debug_addrandombtn:Hide()
-
--- Initially hide the frame
---MainFrame:Hide()
 
 -- Define the slash commands
 SLASH_WHOLOOT1 = "/wholoot"

@@ -2,18 +2,16 @@ WhoLootsOptionsEntries = {}
 
 -- Create the options frame
 WhoLootsOptionsFrame = CreateFrame("Frame", nil, nil, "BackdropTemplate")
-WhoLootsOptionsFrame.name = "WhoLoots"
+WhoLootsOptionsFrame.name = "WhoLootsOptionsFrame"
 WhoLootsOptionsFrame:SetSize(200, 240)
 WhoLootData.OptionsFrame = WhoLootsOptionsFrame
 
 -- Make us a child of MainFrame, so we move with it.
-WhoLootsOptionsFrame:SetParent(WhoLootData.MainFrame)
+WhoLootsOptionsFrame:ClearAllPoints()
 WhoLootsOptionsFrame:SetPoint("TOPLEFT", WhoLootData.MainFrame, "TOPRIGHT", 0, 0)
 
 -- Handle Events --
 function WhoLootsOptionsEntries.LoadOptions()
-
-    WhoGotLootsSavedData = WhoGotLootsSavedData or {}
 
     -- Set the initial values of the options
     if WhoGotLootsSavedData.AutoCloseOnEmpty == nil then WhoGotLootsSavedData.AutoCloseOnEmpty = true end
@@ -38,15 +36,7 @@ function WhoLootsOptionsEntries.LoadOptions()
     end
 end
 
-
--- Apply the backdrop to the frame
-local backdrop = {
-    bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-    edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-    edgeSize = 4,
-    insets = { left = 1, right = 1, top = 1, bottom = 1 },
-}
-WhoLootsOptionsFrame:SetBackdrop(backdrop)
+WhoLootsOptionsFrame:SetBackdrop(WhoGotLootUtil.Backdrop)
 WhoLootsOptionsFrame:SetBackdropColor(0.2, 0.2, 0.2, 1) -- Set the background color (RGBA)
 WhoLootsOptionsFrame:SetBackdropBorderColor(0, 0, 0, 1) -- Set the border color (RGBA)
 
@@ -60,7 +50,7 @@ bg:SetAllPoints(WhoLootsOptionsFrame)
 local title = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title:SetPoint("TOPLEFT", 16, -16)
 title:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
-title:SetText("Who Got Loots - Options")
+title:SetText("Options")
 
 -- Create a frame holder for the options
 local optionsFrameHolder = CreateFrame("Frame", nil, WhoLootsOptionsFrame)
@@ -162,7 +152,7 @@ hideUnequippable_Desc:SetParent(optionsFrameHolder)
 local soundToggle = CreateFrame("CheckButton", "WhoLootsSoundToggle", WhoLootsOptionsFrame, "InterfaceOptionsCheckButtonTemplate")
 soundToggle:SetScript("OnClick", function(self)
     local tick = self:GetChecked()
-    WhoLootsOptionsEntries.SoundEnabled = tick
+    WhoGotLootsSavedData.SoundEnabled = tick
     if tick then
         PlaySound(856) -- SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON
     else
