@@ -4,6 +4,8 @@ WhoLootData.ChildFrames = {} -- Contains sub tables with each frame, progress ba
 WhoLootData.DefaultDuration = 60 -- Default duration for each frame to be visible.
 
 MainFrame = CreateFrame("Frame", nil, nil, "BackdropTemplate")
+MainFrame:SetParent(UIParent)
+
 WhoLootData.MainFrame = MainFrame
 
 -- Register Events --
@@ -14,26 +16,18 @@ MainFrame:RegisterEvent("ENCOUNTER_LOOT_RECEIVED")
 -- Handle Events --
 function MainFrame:OnEvent(event, arg1, arg2, arg3, arg4, arg5)
     if event == "ADDON_LOADED" and arg1 == "WhoGotLoots" then
-        
-        WhoGotLootsSavedData = WhoGotLootsSavedData or {}
 
-        -- Set the saved position of the window
+        WhoLootsOptionsEntries.LoadOptions()
+
+        -- Set window position (we do this after loading the options, because the saved position is loaded in LoadOptions)
         if WhoGotLootsSavedData.SavedPos then
-            MainFrame:SetPoint(unpack(WhoGotLootsSavedData.SavedPos))
+            WhoLootData.MainFrame:SetPoint(unpack(WhoGotLootsSavedData.SavedPos))
         else
-            MainFrame:SetPoint("CENTER")
+            WhoLootData.MainFrame:SetPoint("CENTER")
         end
 
-        -- Set the saved scale of the window
-        if WhoGotLootsSavedData.SavedSize then
-            MainFrame:SetScale(WhoGotLootsSavedData.SavedSize)
-        else
-            MainFrame:SetScale(1.0)
-        end
-
-        MainFrame:SetParent(UIParent)
-
-        WhoLootsOptionsEntries.LoadOptions(MainFrame)
+        -- Set window scale.
+        WhoLootData.MainFrame:SetScale(WhoGotLootsSavedData.SavedSize)
 
     elseif event == "ENCOUNTER_LOOT_RECEIVED" then
         local itemLink = arg3
@@ -375,7 +369,8 @@ function AddLootFrame(player, itemLink)
         ResortFrames()
 
         -- Play a sound
-        PlaySound(145739)
+        print(WhoLootsOptionsEntries.SoundEnabled)
+        if WhoLootsOptionsEntries.SoundEnabled == true then PlaySound(145739) end
     end)
 end
 
@@ -408,6 +403,7 @@ function FadeOutFrame(frame)
             end
             self:Hide()
             self:SetScript("OnUpdate", nil)
+            self = nil
             ResortFrames()
         end
     end)

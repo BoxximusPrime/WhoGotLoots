@@ -1,16 +1,32 @@
 WhoLootsOptionsEntries = {}
 
--- Handle Events --
-function WhoLootsOptionsEntries.LoadOptions(asdf)
+-- Create the options frame
+WhoLootsOptionsFrame = CreateFrame("Frame", nil, nil, "BackdropTemplate")
+WhoLootsOptionsFrame.name = "WhoLoots"
+WhoLootsOptionsFrame:SetSize(200, 240)
+WhoLootData.OptionsFrame = WhoLootsOptionsFrame
 
-    -- Make us a child of MainFrame, so we move with it.
-    WhoLootsOptionsFrame:SetParent(WhoLootData.MainFrame)
-    WhoLootsOptionsFrame:SetPoint("TOPLEFT", WhoLootData.MainFrame, "TOPRIGHT", 0, 0)
+-- Make us a child of MainFrame, so we move with it.
+WhoLootsOptionsFrame:SetParent(WhoLootData.MainFrame)
+WhoLootsOptionsFrame:SetPoint("TOPLEFT", WhoLootData.MainFrame, "TOPRIGHT", 0, 0)
+
+-- Handle Events --
+function WhoLootsOptionsEntries.LoadOptions()
+
+    WhoGotLootsSavedData = WhoGotLootsSavedData or {}
+
+    -- Set the initial values of the options
+    if WhoGotLootsSavedData.AutoCloseOnEmpty == nil then WhoGotLootsSavedData.AutoCloseOnEmpty = true end
+    if WhoGotLootsSavedData.LockWindow == nil then WhoGotLootsSavedData.LockWindow = false end
+    if WhoGotLootsSavedData.HideUnequippable == nil then WhoGotLootsSavedData.HideUnequippable = false end
+    if WhoGotLootsSavedData.SavedSize == nil then WhoGotLootsSavedData.SavedSize = 1 end
+    if WhoGotLootsSavedData.SoundEnabled == nil then WhoGotLootsSavedData.SoundEnabled = true end
 
     WhoLootsOptionsEntries.AutoClose:SetChecked(WhoGotLootsSavedData.AutoCloseOnEmpty)
     WhoLootsOptionsEntries.LockWindow:SetChecked(WhoGotLootsSavedData.LockWindow)
     WhoLootsOptionsEntries.HideUnequippable:SetChecked(WhoGotLootsSavedData.HideUnequippable)
     WhoLootsOptionsEntries.ScaleSlider:SetValue(WhoGotLootsSavedData.SavedSize)
+    WhoLootsOptionsEntries.SoundToggle:SetChecked(WhoGotLootsSavedData.SoundEnabled)
 
     -- Set the moveable state of the main frame
     if WhoGotLootsSavedData.LockWindow then
@@ -22,20 +38,14 @@ function WhoLootsOptionsEntries.LoadOptions(asdf)
     end
 end
 
-WhoLootsOptionsFrame = CreateFrame("Frame", nil, nil, "BackdropTemplate")
-WhoLootsOptionsFrame.name = "WhoLoots"
-WhoLootsOptionsFrame:SetPoint("CENTER")
-WhoLootsOptionsFrame:SetSize(200, 210)
-WhoLootData.OptionsFrame = WhoLootsOptionsFrame
 
+-- Apply the backdrop to the frame
 local backdrop = {
     bgFile = "Interface/Tooltips/UI-Tooltip-Background",
     edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
     edgeSize = 4,
     insets = { left = 1, right = 1, top = 1, bottom = 1 },
 }
-
--- Apply the backdrop to the frame
 WhoLootsOptionsFrame:SetBackdrop(backdrop)
 WhoLootsOptionsFrame:SetBackdropColor(0.2, 0.2, 0.2, 1) -- Set the background color (RGBA)
 WhoLootsOptionsFrame:SetBackdropBorderColor(0, 0, 0, 1) -- Set the border color (RGBA)
@@ -148,9 +158,36 @@ hideUnequippable_Desc:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
 hideUnequippable_Desc:SetTextColor(0.7, 0.7, 0.7)
 hideUnequippable_Desc:SetParent(optionsFrameHolder)
 
+-- Sound Toggle
+local soundToggle = CreateFrame("CheckButton", "WhoLootsSoundToggle", WhoLootsOptionsFrame, "InterfaceOptionsCheckButtonTemplate")
+soundToggle:SetScript("OnClick", function(self)
+    local tick = self:GetChecked()
+    WhoLootsOptionsEntries.SoundEnabled = tick
+    if tick then
+        PlaySound(856) -- SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON
+    else
+        PlaySound(857) -- SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF
+    end
+end)
+soundToggle.label = _G[soundToggle:GetName() .. "Text"]
+soundToggle.label:SetText("Enable Sound")
+soundToggle.tooltipText = "Enable sound effects"
+soundToggle.tooltipRequirement = "Enable Sound"
+soundToggle:SetPoint("TOPLEFT", hideUnequippable_Desc, "BOTTOMLEFT", -15, -16)
+soundToggle:SetParent(optionsFrameHolder)
+WhoLootsOptionsEntries.SoundToggle = soundToggle
+
+-- Option text
+local soundToggle_Desc = optionsFrameHolder:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+soundToggle_Desc:SetPoint("TOPLEFT", soundToggle, "BOTTOMLEFT", 15, -8)
+soundToggle_Desc:SetText("Enable sound effects.")
+soundToggle_Desc:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
+soundToggle_Desc:SetTextColor(0.7, 0.7, 0.7)
+soundToggle_Desc:SetParent(optionsFrameHolder)
+
 -- Scale Slider Title
 local scaleSlider_Desc = optionsFrameHolder:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-scaleSlider_Desc:SetPoint("TOPLEFT", hideUnequippable_Desc, "BOTTOMLEFT", 0, -26)
+scaleSlider_Desc:SetPoint("TOPLEFT", soundToggle_Desc, "BOTTOMLEFT", 0, -26)
 scaleSlider_Desc:SetText("Adjust the scale of the window.")
 scaleSlider_Desc:SetFont("Fonts\\FRIZQT__.TTF", 11, "")
 scaleSlider_Desc:SetParent(optionsFrameHolder)
