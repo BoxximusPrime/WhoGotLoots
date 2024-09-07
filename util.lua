@@ -102,7 +102,6 @@ function WGLUtil.GetItemMainStat(mainStat, findStat)
 end
 
 function WGLUtil.SimplifyStatName(statName)
-  print(statName)
   if statName == "Versatility" then return "Vers"
   elseif statName == "Crit" then return "Crit"
   elseif statName == "Haste" then return "Haste"
@@ -111,5 +110,9 @@ function WGLUtil.SimplifyStatName(statName)
   elseif statName == "Strength" then return "Str"
   elseif statName == "Intellect" then return "Int"
   elseif statName == "Stamina" then return "Stam"
-  end
+  elseif statName == "Avoidance" then return "Avoid"
+  elseif statName == "Leech" then return "Leech"
+  elseif statName == "Speed" then return "Speed"
+  elseif statName == "Indestructible" then return "Indest"
+  else return nil end
 end

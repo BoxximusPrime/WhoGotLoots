@@ -302,13 +302,20 @@ function AddLootFrame(player, itemLink)
                 end
 
                 -- If the item level is the same as what we have now, give a quick stat change breakdown.
-                if ilvlDiff == 0 and diffStat == 0 and not (itemEquipLoc == "INVTYPE_HOLDABLE" and itemEquipLoc == "INVTYPE_WEAPONOFFHAND") then
+                if ilvlDiff == 0 and not (itemEquipLoc == "INVTYPE_HOLDABLE" and itemEquipLoc == "INVTYPE_WEAPONOFFHAND") then
                     local stats = {
                         Haste = { ours = 0, theirs = 0 },
                         Mastery = { ours = 0, theirs = 0 },
                         Versatility = { ours = 0, theirs = 0 },
-                        Crit = { ours = 0, theirs = 0 }
+                        Crit = { ours = 0, theirs = 0 },
+                        Vers = { ours = 0, theirs = 0 },
+                        Avoidance = { ours = 0, theirs = 0 },
+                        Leech = { ours = 0, theirs = 0 },
+                        Speed = { ours = 0, theirs = 0 },
+                        Indestructible = { ours = 0, theirs = 0 }
                     }
+
+                    local preferredOrder = { "Haste", "Mastery", "Versatility", "Crit", "Vers", "Avoidance", "Leech", "Speed", "Indestructible" }
 
                     -- Get the stats of the item we're comparing to.
                     for stat, value in pairs(CompareItemStats) do
@@ -316,6 +323,11 @@ function AddLootFrame(player, itemLink)
                         elseif stat == "ITEM_MOD_MASTERY_RATING_SHORT" then stats.Mastery.theirs = value
                         elseif stat == "ITEM_MOD_VERSATILITY" then stats.Versatility.theirs = value
                         elseif stat == "ITEM_MOD_CRIT_RATING_SHORT" then stats.Crit.theirs = value
+                        elseif stat == "ITEM_MOD_VERSATILITY" then stats.Vers.theirs = value
+                        elseif stat == "ITEM_MOD_CR_AVOIDANCE_SHORT" then stats.Avoidance.theirs = value
+                        elseif stat == "ITEM_MOD_CR_LIFESTEAL_SHORT" then stats.Leech.theirs = value
+                        elseif stat == "ITEM_MOD_CR_SPEED_SHORT" then stats.Speed.theirs = value
+                        elseif stat == "ITEM_MOD_CR_STURDINESS_SHORT" then stats.Indestructible.theirs = value
                         end
                     end
 
@@ -326,19 +338,23 @@ function AddLootFrame(player, itemLink)
                         elseif stat == "ITEM_MOD_MASTERY_RATING_SHORT" then stats.Mastery.ours = value
                         elseif stat == "ITEM_MOD_VERSATILITY" then stats.Versatility.ours = value
                         elseif stat == "ITEM_MOD_CRIT_RATING_SHORT" then stats.Crit.ours = value
+                        elseif stat == "ITEM_MOD_VERSATILITY" then stats.Vers.ours = value
+                        elseif stat == "ITEM_MOD_CR_AVOIDANCE_SHORT" then stats.Avoidance.ours = value
+                        elseif stat == "ITEM_MOD_CR_LIFESTEAL_SHORT" then stats.Leech.ours = value
+                        elseif stat == "ITEM_MOD_CR_SPEED_SHORT" then stats.Speed.ours = value
+                        elseif stat == "ITEM_MOD_CR_STURDINESS_SHORT" then stats.Indestructible.ours = value
                         end
                     end
 
                     -- Compare the stats.
-                    for stat, value in pairs(stats) do
+                    for _, stat in ipairs(preferredOrder) do
+                        local value = stats[stat]
                         local diff = value.theirs - value.ours
                         local statName = WGLUtil.SimplifyStatName(stat)
 
                         if statName ~= nil then
                             if diff > 0 then
                                 table.insert(BottomText, "|cFF00FF00+" .. diff .. "|r " .. statName)
-                            -- elseif diff == 0 then
-                            --     table.insert(BottomText, "=" .. statName)
                             elseif diff < 0 then
                                 table.insert(BottomText, "|cFFFF0000" .. diff .. "|r " .. statName)
                             end
@@ -432,6 +448,7 @@ function WhoLootData.HoverFrame(fromFrame, toState)
             frameData.Icon:ClearAllPoints()
             frameData.Icon:SetPoint("TOPLEFT",
                 WGLUtil.LerpFloat(WhoLootFrameData.IconStartLeftPos, WhoLootFrameData.IconEndLeftPos, progress), WhoLootFrameData.IconTopPos)
+            frameData.Icon:SetAlpha(1 - progress)
             frameData.ItemName:ClearAllPoints()
             frameData.ItemName:SetPoint("TOPLEFT",
                 WGLUtil.LerpFloat(WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameEndLeftPos, progress), WhoLootFrameData.ItemNameTopPos)
@@ -460,6 +477,7 @@ function WhoLootData.HoverFrame(fromFrame, toState)
             frameData.Icon:ClearAllPoints()
             frameData.Icon:SetPoint("TOPLEFT",
                 WGLUtil.LerpFloat(WhoLootFrameData.IconStartLeftPos, WhoLootFrameData.IconEndLeftPos, progress), WhoLootFrameData.IconTopPos)
+            frameData.Icon:SetAlpha(1 - progress)
             frameData.ItemName:ClearAllPoints()
             frameData.ItemName:SetPoint("TOPLEFT",
                 WGLUtil.LerpFloat(WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameEndLeftPos, progress), WhoLootFrameData.ItemNameTopPos)

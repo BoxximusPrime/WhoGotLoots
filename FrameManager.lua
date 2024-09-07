@@ -4,14 +4,14 @@ WhoGotLootsNumFrames = 10
 WhoLootFrameData = WhoLootFrameData or {}
 
 -- Animation Values
-WhoLootFrameData.HoverAnimTime = 0.23
+WhoLootFrameData.HoverAnimTime = 0.3
 WhoLootFrameData.IconStartLeftPos = 55
 WhoLootFrameData.ItemNameStartLeftPos = 85
 WhoLootFrameData.BottomTextStartLeftPos = 85
 
-WhoLootFrameData.IconEndLeftPos = 5
-WhoLootFrameData.ItemNameEndLeftPos = 35
-WhoLootFrameData.BottomTextEndLeftPos = 35
+WhoLootFrameData.IconEndLeftPos = -30
+WhoLootFrameData.ItemNameEndLeftPos = 5
+WhoLootFrameData.BottomTextEndLeftPos = 5
 
 WhoLootFrameData.IconTopPos = -5
 WhoLootFrameData.ItemNameTopPos = -8
@@ -27,6 +27,7 @@ function WhoGotLootsFrames:CreateFrame()
     local newframe =  CreateFrame("Frame", nil, nil, "BackdropTemplate")
     newframe:SetWidth(240)
     newframe:SetHeight(35)
+    newframe:SetClipsChildren(true)
 
     -- Create a text showing which player it was.
     local playerText = newframe:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -78,7 +79,7 @@ function WhoGotLootsFrames:CreateFrame()
     -- Create a close button to remove the frame.
     local close = CreateFrame("Button", nil, newframe, "UIPanelCloseButton")
     close:SetSize(15, 15)
-    close:SetPoint("RIGHT", -3, 0)
+    close:SetPoint("TOPRIGHT", -3, -3)
 
     newframe:SetBackdrop(WGLUtil.Backdrop)
     newframe:SetBackdropBorderColor(0, 0, 0, 1) -- Set the border color (RGBA)
