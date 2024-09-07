@@ -177,17 +177,7 @@ function AddLootFrame(player, itemLink)
         itemText:SetText("|c" .. select(4, GetItemQualityColor(CompareItem:GetItemQuality())) .. "[" .. itemName  .. "]" .. "|r")
         itemText:SetParent(newframe)
 
-        -- Compare Against the item we have in the same slot.
-        local slotID = GetInventorySlotInfo(GetItemSlotName(itemLink))
-        local CurrentItemLink = GetInventoryItemLink("player", slotID)
-        local CurrentItem, IsNotArmor
-
         local BottomText = {}
-
-        -- Check if this is an armor piece.
-        if CurrentItemLink then 
-            IsNotArmor = ItemType == "Trinket" or ItemType == "Ring" or ItemType == "Weapon" or ItemType == "Neck" or ItemType == "Cloak"
-        end
 
         -- If we can equip this item, check if it's an upgrade.
         if CanEquip then
@@ -197,6 +187,7 @@ function AddLootFrame(player, itemLink)
             end
 
             local ourIlvl = 0
+            local ItemToCompare = nil
 
             -- If this is a trinket, find the lowest ilvl trinket we have.
             if itemEquipLoc == "INVTYPE_TRINKET" then
@@ -212,6 +203,8 @@ function AddLootFrame(player, itemLink)
                 end
                 ourIlvl = math.min(trinket1Ilvl, trinket2Ilvl)
 
+                ItemToCompare = Item:CreateFromItemLink(trinket1Ilvl < trinket2Ilvl and trinket1 or trinket2)
+
             -- Same for ring
             elseif itemEquipLoc == "INVTYPE_FINGER" then
                 local ring1 = GetInventoryItemLink("player", 11)
@@ -226,58 +219,118 @@ function AddLootFrame(player, itemLink)
                 end
                 ourIlvl = math.min(ring1Ilvl, ring2Ilvl)
 
+                ItemToCompare = Item:CreateFromItemLink(ring1Ilvl < ring2Ilvl and ring1 or ring2)
+
             -- Normal comparison.
             else
-                if CurrentItemLink then
-                    ourIlvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(slotID))
-                end
+                ItemToCompare = Item:CreateFromItemLink(GetInventoryItemLink("player", GetInventorySlotInfo(GetItemSlotName(itemLink))))
+            end
+
+            if ItemToCompare == nil then
+                print("ERROR: ItemToCompare is nil. Should not happen")
+                return
+            end
+
+            -- Compare Against the item we have in the same slot.
+            local slotID = GetInventorySlotInfo(GetItemSlotName(itemLink))
+            local CurrentItemLink = GetInventoryItemLink("player", slotID)
+            local CurrentItem, IsNotArmor
+
+            -- Check if this is an armor piece.
+            if CurrentItemLink then 
+                IsNotArmor = ItemType == "Trinket" or ItemType == "Ring" or ItemType == "Weapon" or ItemType == "Neck" or ItemType == "Cloak"
+                ourIlvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(slotID))
             end
 
             -- Show the ilvl diff if any
             local ilvlDiff = efectiveIlvl - ourIlvl
             if ilvlDiff > 0 then
                 table.insert(BottomText, "|cFF00FF00+" .. ilvlDiff .. "|r ilvl")
-            else
+            elseif ilvlDiff < 0 then
                 table.insert(BottomText, "|cFFFF0000" .. ilvlDiff .. "|r ilvl")
             end
 
-            -- Figure out the main stat difference.
-            if itemEquipLoc ~= "INVTYPE_NECK" and itemEquipLoc ~= "INVTYPE_FINGER" then
+            -- Get the main stat of the item we're comparing to.
+            local CompareItemStats = C_Item.GetItemStats(itemLink)
 
-                -- Get the main stat of the item we're comparing to.
-                local CompareItemStats = C_Item.GetItemStats(itemLink)
+            --Debug: print each stat
+            for stat, value in pairs(CompareItemStats) do
+                print(stat, value)
+            end
 
-                if CompareItemStats ~= nil then
+            if CompareItemStats ~= nil then
 
-                    -- First, figure out which stat is relevant to us. Get the player's main stats, and find the highest one.
-                    local PlayerTopStat = WhoGotLootUtil.GetPlayerMainStat()
-                    
-                    -- Now, get the main stat of our currently equipped item.
-                    local CompareItemMainStat = WhoGotLootUtil.GetItemMainStat(CompareItemStats, PlayerTopStat)
+                -- First, figure out which stat is relevant to us. Get the player's main stats, and find the highest one.
+                local PlayerTopStat = WhoGotLootUtil.GetPlayerMainStat()
+                
+                -- Now, get the main stat of our currently equipped item.
+                local CompareItemMainStat = WhoGotLootUtil.GetItemMainStat(CompareItemStats, PlayerTopStat)
 
-                    -- If we have an item equipped in the same slot, compare the main stats.
-                    local diffStat = 0
-                    if CurrentItemLink then
-                        ourItemMainStat = WhoGotLootUtil.GetItemMainStat(C_Item.GetItemStats(CurrentItemLink), PlayerTopStat)
+                -- If we have an item equipped in the same slot, compare the main stats.
+                local diffStat = 0
+                if CurrentItemLink then
+                    ourItemMainStat = WhoGotLootUtil.GetItemMainStat(C_Item.GetItemStats(CurrentItemLink), PlayerTopStat)
 
-                        if CompareItemMainStat ~= nil then
-                            diffStat = CompareItemMainStat - ourItemMainStat
-                        elseif ourItemMainStat ~= nil then
-                            diffStat = -ourItemMainStat
-                        else
-                            diffStat = 0
+                    if CompareItemMainStat ~= nil then
+                        diffStat = CompareItemMainStat - ourItemMainStat
+                    elseif ourItemMainStat ~= nil then
+                        diffStat = -ourItemMainStat
+                    else
+                        diffStat = 0
+                    end
+                end
+
+                -- Create a text showing the difference in main stat.
+                if diffStat ~= 0 then
+                    local diffStatText = ""
+                    if diffStat > 0 then
+                        diffStatText = "|cFF00FF00+" .. diffStat .. "|r"
+                    elseif diffStat < 0 then
+                        diffStatText = "|cFFFF0000" .. diffStat .. "|r"
+                    end
+                    table.insert(BottomText, diffStatText .. " " .. PlayerTopStat)
+                end
+
+                -- If the item level is the same as what we have now, give a quick stat change breakdown.
+                if ilvlDiff == 0 and diffStat == 0 then
+                    local stats = {
+                        Haste = { ours = 0, theirs = 0 },
+                        Mastery = { ours = 0, theirs = 0 },
+                        Versatility = { ours = 0, theirs = 0 },
+                        Crit = { ours = 0, theirs = 0 }
+                    }
+
+                    -- Get the stats of the item we're comparing to.
+                    for stat, value in pairs(CompareItemStats) do
+                        if stat == "ITEM_MOD_HASTE_RATING_SHORT" then stats.Haste.theirs = value
+                        elseif stat == "ITEM_MOD_MASTERY_RATING_SHORT" then stats.Mastery.theirs = value
+                        elseif stat == "ITEM_MOD_VERSATILITY" then stats.Versatility.theirs = value
+                        elseif stat == "ITEM_MOD_CRIT_RATING_SHORT" then stats.Crit.theirs = value
                         end
                     end
 
-                    -- Create a text showing the difference in main stat.
-                    if diffStat ~= 0 then
-                        local diffStatText = ""
-                        if diffStat > 0 then
-                            diffStatText = "|cFF00FF00+" .. diffStat .. "|r"
-                        elseif diffStat < 0 then
-                            diffStatText = "|cFFFF0000" .. diffStat .. "|r"
+                    -- Get the stats of our currently equipped item.
+                    local ourItemStats = C_Item.GetItemStats(CurrentItemLink)
+                    for stat, value in pairs(ourItemStats) do
+                        if stat == "ITEM_MOD_HASTE_RATING_SHORT" then stats.Haste.ours = value
+                        elseif stat == "ITEM_MOD_MASTERY_RATING_SHORT" then stats.Mastery.ours = value
+                        elseif stat == "ITEM_MOD_VERSATILITY" then stats.Versatility.ours = value
+                        elseif stat == "ITEM_MOD_CRIT_RATING_SHORT" then stats.Crit.ours = value
                         end
-                        table.insert(BottomText, diffStatText .. " " .. PlayerTopStat)
+                    end
+
+                    -- Compare the stats.
+                    for stat, value in pairs(stats) do
+                        local diff = value.theirs - value.ours
+                        local statName = WhoGotLootUtil.SimplifyStatName(stat)
+
+                        if statName ~= nil then
+                            if diff > 0 then
+                                table.insert(BottomText, "|cFF00FF00+" .. diff .. "|r " .. statName)
+                            elseif diff < 0 then
+                                table.insert(BottomText, "|cFFFF0000" .. diff .. "|r " .. statName)
+                            end
+                        end
                     end
                 end
             end
@@ -292,7 +345,7 @@ function AddLootFrame(player, itemLink)
         end
 
         BottomTextFrame = newframe:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        BottomTextFrame:SetFont("Fonts\\FRIZQT__.TTF", 8, "")
+        BottomTextFrame:SetFont("Fonts\\FRIZQT__.TTF", 7, "")
         BottomTextFrame:SetPoint("TOPLEFT", itemText, "BOTTOMLEFT", 0, -2)
         BottomTextFrame:SetText(table.concat(BottomText, "  "))
         BottomTextFrame:SetParent(newframe)
@@ -469,6 +522,7 @@ closeBtn:SetPoint("TOPRIGHT", MainFrame, "TOPRIGHT", -3, -5)
 closeBtn:SetSize(15, 15)
 closeBtn:SetScript("OnClick", function(self)
     MainFrame:Hide()
+    WhoLootData.OptionsFrame:Hide()
 end)
 
 -- Add a button to open the options menu
@@ -545,10 +599,13 @@ SlashCmdList["WHOLOOT"] = function(msg, editbox)
         print("Debug mode is now " .. (debug_addrandombtn:IsVisible() and "enabled" or "disabled") .. ".")
     elseif msg:sub(1, 3) == "add" then
         local itemID = tonumber(msg:sub(5))
+        
         if itemID then
             AddLootFrame("Andisae", itemID)
         else
-            print("Invalid item ID.")
+            -- Try parsing it as an itemLink.
+            local itemLink = msg:sub(5)
+            AddLootFrame("Andisae", itemLink)
         end
     else
         print("Unknown command. Use '/wholoot toggle' or '/wholoot debug'.")

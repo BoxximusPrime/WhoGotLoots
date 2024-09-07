@@ -82,3 +82,15 @@ function WhoGotLootUtil.GetItemMainStat(mainStat, findStat)
   if foundStats[findStat] == nil then return nil end
   return foundStats[findStat]
 end
+
+function WhoGotLootUtil.SimplifyStatName(statName)
+  if statName == "Versatility" then return "Vers"
+  elseif statName == "Critical Strike" then return "Crit"
+  elseif statName == "Haste" then return "Haste"
+  elseif statName == "Mastery" then return "Mast"
+  elseif statName == "Agility" then return "Agi"
+  elseif statName == "Strength" then return "Str"
+  elseif statName == "Intellect" then return "Int"
+  elseif statName == "Stamina" then return "Stam"
+  end
+end
