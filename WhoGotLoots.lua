@@ -1,5 +1,5 @@
 -- Define a table to store global variables
-WhoLootData = {}
+WhoLootData = WhoLootData or {}
 WhoLootData.DefaultDuration = 60 -- Default duration for each frame to be visible.
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
 
@@ -261,7 +261,7 @@ function AddLootFrame(player, itemLink)
                 end
 
                 -- Next, figure out which stat is relevant to us. Get the player's main stats, and find the highest one.
-                local PlayerTopStat = WhoGotLootUtil.GetPlayerMainStat()
+                local PlayerTopStat = WGLUtil.GetPlayerMainStat()
 
                 -- Get the compare item's stats.
                 local CompareItemStats = C_Item.GetItemStats(itemLink)
@@ -272,13 +272,13 @@ function AddLootFrame(player, itemLink)
 
                     local CompareItemMainStat = nil
                     if CompareItemStats then
-                        CompareItemMainStat =  WhoGotLootUtil.GetItemMainStat(CompareItemStats, PlayerTopStat)
+                        CompareItemMainStat =  WGLUtil.GetItemMainStat(CompareItemStats, PlayerTopStat)
                     end
 
                     -- If we have an item equipped in the same slot, compare the main stats.
                     if CurrentItemLink then
 
-                        ourItemMainStat = WhoGotLootUtil.GetItemMainStat(C_Item.GetItemStats(CurrentItemLink), PlayerTopStat)
+                        ourItemMainStat = WGLUtil.GetItemMainStat(C_Item.GetItemStats(CurrentItemLink), PlayerTopStat)
 
                         if CompareItemMainStat ~= nil then
                             diffStat = CompareItemMainStat - ourItemMainStat
@@ -332,7 +332,7 @@ function AddLootFrame(player, itemLink)
                     -- Compare the stats.
                     for stat, value in pairs(stats) do
                         local diff = value.theirs - value.ours
-                        local statName = WhoGotLootUtil.SimplifyStatName(stat)
+                        local statName = WGLUtil.SimplifyStatName(stat)
 
                         if statName ~= nil then
                             if diff > 0 then
@@ -349,7 +349,7 @@ function AddLootFrame(player, itemLink)
         end
 
         if not CanEquip then
-            if WhoGotLootUtil.IsArmorPiece(itemEquipLoc) then
+            if WGLUtil.IsArmorPiece(itemEquipLoc) then
                 table.insert(BottomText, "|cffff0000" .. itemSubType .. "|r")
             else
                 table.insert(BottomText, "|cffff0000" .. _G[itemEquipLoc] .. "|r")
@@ -372,8 +372,10 @@ function AddLootFrame(player, itemLink)
             frame.BottomText:SetText(table.concat(BottomText, "  "))
             frame.Icon:SetTexture(itemTexture)
             frame.ProgBar:SetValue(0)
+            frame.Item = itemLink
             frame.InUse = true
             frame.Frame:SetParent(MainFrame)
+            WhoGotLootsFrames:PrepareFrame(frame)
             AnimateFrameScale(frame, 1.0, 0.2)
 
             -- Store the frame in the ChildFrames table.
@@ -390,6 +392,86 @@ function AddLootFrame(player, itemLink)
         end
     end)
 end
+
+function WhoLootData.HoverFrame(fromFrame, toState)
+
+    -- Find the frame in the ActiveFrames table.
+    local frameData = nil
+    for i, frame in ipairs(WhoLootData.ActiveFrames) do
+        if frame[1].Frame == fromFrame then
+            frameData = frame[1]
+            break
+        end
+    end
+
+    if frameData == nil or frameData.Animating then return end
+
+    if frameData == nil then
+        print("ERROR: Couldn't find the frame in the ActiveFrames table.")
+        return
+    end
+
+    if toState then
+        GameTooltip:SetOwner(frameData.Frame, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink(frameData.Item)
+        GameTooltip:Show()
+
+        -- On hover we're going to move some things over time.
+        frameData.Frame:SetScript("OnUpdate", function(self, elapsed)
+
+            if frameData.HoverAnimDelta == nil then frameData.HoverAnimDelta = 0 end
+            frameData.HoverAnimDelta = frameData.HoverAnimDelta + elapsed * 2
+            local progress = WGLUtil.Clamp(frameData.HoverAnimDelta / WhoLootFrameData.HoverAnimTime, 0, 1)
+            progress = math.sin(progress * math.pi / 2)
+
+            WGLUtil.LerpBackdropColor(frameData.Frame, WhoLootFrameData.HoverColor, WhoLootFrameData.ExitColor, 1 - progress)
+
+            frameData.Player:SetAlpha(1 - progress)
+            frameData.Icon:ClearAllPoints()
+            frameData.Icon:SetPoint("TOPLEFT",
+                WGLUtil.LerpFloat(WhoLootFrameData.IconStartLeftPos, WhoLootFrameData.IconEndLeftPos, progress), WhoLootFrameData.IconTopPos)
+            frameData.ItemName:ClearAllPoints()
+            frameData.ItemName:SetPoint("TOPLEFT",
+                WGLUtil.LerpFloat(WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameEndLeftPos, progress), WhoLootFrameData.ItemNameTopPos)
+            frameData.BottomText:ClearAllPoints()
+            frameData.BottomText:SetPoint("TOPLEFT", frameData.ItemName, "BOTTOMLEFT", 0, -2)
+            
+
+            if progress >= 1 then
+                frameData.Frame:SetScript("OnUpdate", nil) -- Stop the animation
+            end
+
+        end)
+    else
+        GameTooltip:Hide()
+
+        -- On leave we're going to move some things back over time.
+        if frameData.HoverAnimDelta == nil then frameData.HoverAnimDelta = WhoLootFrameData.HoverAnimTime end
+        frameData.Frame:SetScript("OnUpdate", function(self, elapsed)
+            frameData.HoverAnimDelta = frameData.HoverAnimDelta - elapsed
+            local progress = WGLUtil.Clamp(frameData.HoverAnimDelta / WhoLootFrameData.HoverAnimTime, 0, 1)
+            progress = math.sin(progress * math.pi / 2)
+
+            WGLUtil.LerpBackdropColor(frameData.Frame, WhoLootFrameData.HoverColor, WhoLootFrameData.ExitColor, 1 - progress)
+
+            frameData.Player:SetAlpha(1 - progress)
+            frameData.Icon:ClearAllPoints()
+            frameData.Icon:SetPoint("TOPLEFT",
+                WGLUtil.LerpFloat(WhoLootFrameData.IconStartLeftPos, WhoLootFrameData.IconEndLeftPos, progress), WhoLootFrameData.IconTopPos)
+            frameData.ItemName:ClearAllPoints()
+            frameData.ItemName:SetPoint("TOPLEFT",
+                WGLUtil.LerpFloat(WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameEndLeftPos, progress), WhoLootFrameData.ItemNameTopPos)
+            frameData.BottomText:ClearAllPoints()
+            frameData.BottomText:SetPoint("TOPLEFT", frameData.ItemName, "BOTTOMLEFT", 0, -2)
+
+            if progress <= 0 then
+                frameData.Frame:SetScript("OnUpdate", nil) -- Stop the animation
+                frameData.HoverAnimDelta = nil
+            end
+        end)
+    end
+end
+
 
 -- Function to resort the frames, if we remove one.
 function WhoLootData.ResortFrames()
@@ -409,6 +491,7 @@ end
 
 function FadeOutFrame(frame)
     frame:SetScript("OnUpdate", function(self, elapsed)
+        frame.Animating = true
         local alpha = self:GetAlpha()
         if alpha > 0 then
             local clamped = math.max(0, alpha - elapsed * 1.5)
@@ -447,6 +530,7 @@ end)
 
 -- Function to animate the scale of a frame.
 function AnimateFrameScale(frame, targetScale, duration)
+    frame.Animating = true
     local startTime = GetTime()
     local initialScale = 1.5
     local scaleChange = targetScale - initialScale
@@ -464,6 +548,7 @@ function AnimateFrameScale(frame, targetScale, duration)
             frame.Frame:SetScale(targetScale)
             frame.Frame:SetBackdropColor(endColor.r, endColor.g, endColor.b, 1)
             frame.Frame:SetScript("OnUpdate", nil) -- Stop the animation
+            frame.Animating = false
         else
             local newScale = initialScale + (scaleChange * progress)
             frame.Frame:SetScale(newScale)
@@ -487,7 +572,7 @@ MainFrame:SetScript("OnDragStop", function(self)
 end)
 
 -- Apply the backdrop to the frame
-MainFrame:SetBackdrop(WhoGotLootUtil.Backdrop)
+MainFrame:SetBackdrop(WGLUtil.Backdrop)
 MainFrame:SetBackdropColor(0.2, 0.2, 0.2, 1) -- Set the background color (RGBA)
 MainFrame:SetBackdropBorderColor(0, 0, 0, 1) -- Set the border color (RGBA)
 

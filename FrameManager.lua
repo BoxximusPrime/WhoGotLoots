@@ -1,7 +1,25 @@
 WhoGotLootsFrames = {}
 WhoGotLootsNumFrames = 10
 
-WhoLootData = WhoLootData or {}
+WhoLootFrameData = WhoLootFrameData or {}
+
+-- Animation Values
+WhoLootFrameData.HoverAnimTime = 0.23
+WhoLootFrameData.IconStartLeftPos = 55
+WhoLootFrameData.ItemNameStartLeftPos = 85
+WhoLootFrameData.BottomTextStartLeftPos = 85
+
+WhoLootFrameData.IconEndLeftPos = 5
+WhoLootFrameData.ItemNameEndLeftPos = 35
+WhoLootFrameData.BottomTextEndLeftPos = 35
+
+WhoLootFrameData.IconTopPos = -5
+WhoLootFrameData.ItemNameTopPos = -8
+WhoLootFrameData.BottomTextTopPos = -8
+
+WhoLootFrameData.HoverColor = { 0.5, 0.5, 0.5, 1 }
+WhoLootFrameData.ExitColor = { 0.2, 0.2, 0.2, 1 }
+
 
 function WhoGotLootsFrames:CreateFrame()
 
@@ -17,7 +35,6 @@ function WhoGotLootsFrames:CreateFrame()
     playerText:SetParent(newframe)
     playerText:SetText("PlayerName")
 
-    -- Create UI
     -- Create a progress bar that will show the timer's progress.
     local progressBar = CreateFrame("StatusBar", nil, newframe)
     progressBar:SetSize(100, 2)
@@ -51,14 +68,11 @@ function WhoGotLootsFrames:CreateFrame()
 
     -- Register a mouseover to show the item tooltip.
     newframe:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:Show()
-        self:SetBackdropColor(0.4, 0.4, 0.4, 1)
+        WhoLootData.HoverFrame(self, true)
     end)
 
     newframe:SetScript("OnLeave", function(self)
-        GameTooltip:Hide()
-        self:SetBackdropColor(0.2, 0.2, 0.2, 1)
+        WhoLootData.HoverFrame(self, false)
     end)
 
     -- Create a close button to remove the frame.
@@ -66,7 +80,7 @@ function WhoGotLootsFrames:CreateFrame()
     close:SetSize(15, 15)
     close:SetPoint("RIGHT", -3, 0)
 
-    newframe:SetBackdrop(WhoGotLootUtil.Backdrop)
+    newframe:SetBackdrop(WGLUtil.Backdrop)
     newframe:SetBackdropBorderColor(0, 0, 0, 1) -- Set the border color (RGBA)
 
     -- Add the frame to the list of frames.
@@ -77,7 +91,10 @@ function WhoGotLootsFrames:CreateFrame()
         Icon = itemTexture,
         BottomText = BottomTextFrame,
         ProgBar = progressBar,
-        InUse = false
+        HoverAnimDelta = nil,
+        Item = nil,
+        InUse = false,
+        Animating = false
     }
 
     close:SetScript("OnClick", function(self)
@@ -99,9 +116,28 @@ function WhoGotLootsFrames:CreateFrame()
             end
         end
     end)
+    close:SetScript("OnEnter", function(self)
+        WhoLootData.HoverFrame(newframe, true)
+    end)
+    close:SetScript("OnLeave", function(self)
+        WhoLootData.HoverFrame(newframe, false)
+    end)
+end
+
+-- Set all the frames to their initial positions.
+function WhoGotLootsFrames:PrepareFrame(frame)
+    frame.Player:SetAlpha(1)
+    frame.Icon:ClearAllPoints()
+    frame.Icon:SetPoint("TOPLEFT", WhoLootFrameData.IconStartLeftPos, WhoLootFrameData.IconTopPos)
+    frame.ItemName:ClearAllPoints()
+    frame.ItemName:SetPoint("TOPLEFT", WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameTopPos)
+    frame.BottomText:ClearAllPoints()
+    frame.BottomText:SetPoint("TOPLEFT", frame.ItemName, "BOTTOMLEFT", 0, -2)
+    frame.Animating = false
 end
 
 -- Create an initial pool.
 for i = 1, WhoGotLootsNumFrames do
     WhoGotLootsFrames:CreateFrame()
 end
+

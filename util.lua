@@ -1,7 +1,7 @@
-WhoGotLootUtil = {}
+WGLUtil = {}
 
 -- List of inventory slot IDs for armor pieces only --
-WhoGotLootUtil.ArmorPieces = {
+WGLUtil.ArmorPieces = {
   "INVTYPE_HEAD",
   "INVTYPE_SHOULDER",
   "INVTYPE_CHEST",
@@ -12,7 +12,7 @@ WhoGotLootUtil.ArmorPieces = {
   "INVTYPE_WAIST"
 }
 
-WhoGotLootUtil.WeaponSlots = {
+WGLUtil.WeaponSlots = {
   "INVTYPE_WEAPON",
   "INVTYPE_2HWEAPON",
   "INVTYPE_WEAPONMAINHAND",
@@ -24,8 +24,8 @@ WhoGotLootUtil.WeaponSlots = {
   "INVTYPE_RANGED2"
 }
 
-function WhoGotLootUtil.IsArmorPiece(slotID)
-  for _, armorSlotID in ipairs(WhoGotLootUtil.ArmorPieces) do
+function WGLUtil.IsArmorPiece(slotID)
+  for _, armorSlotID in ipairs(WGLUtil.ArmorPieces) do
     if slotID == armorSlotID then
       return true
     end
@@ -33,7 +33,7 @@ function WhoGotLootUtil.IsArmorPiece(slotID)
   return false
 end
 
-WhoGotLootUtil.Backdrop = 
+WGLUtil.Backdrop = 
 {
   bgFile = "Interface/Tooltips/UI-Tooltip-Background",
   edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
@@ -41,7 +41,7 @@ WhoGotLootUtil.Backdrop =
   insets = { left = 1, right = 1, top = 1, bottom = 1 },
 }
 
- function WhoGotLootUtil.GetPlayerMainStat()
+ function WGLUtil.GetPlayerMainStat()
     local stats = {
         Strength = { base = 0, effective = 0 },
         Agility = { base = 0, effective = 0 },
@@ -61,8 +61,26 @@ WhoGotLootUtil.Backdrop =
     end
 end
 
+function WGLUtil.LerpFloat(a, b, t)
+  return a + (b - a) * t
+end
+
+function WGLUtil.LerpBackdropColor(frame, a, b, t)
+  local red = WGLUtil.LerpFloat(a[1], b[1], t)
+  local green = WGLUtil.LerpFloat(a[2], b[2], t)
+  local blue = WGLUtil.LerpFloat(a[3], b[3], t)
+  local alpha = WGLUtil.LerpFloat(a[4], b[4], t)
+  frame:SetBackdropColor(red, green, blue, alpha)
+end
+
+function WGLUtil.Clamp(value, min, max)
+  if value < min then return min end
+  if value > max then return max end
+  return value
+end
+
 -- Find which is the highest stat between agility, strength, and intellect.
-function WhoGotLootUtil.GetItemMainStat(mainStat, findStat)
+function WGLUtil.GetItemMainStat(mainStat, findStat)
   local highestStat = 0
   local highestStatName = ""
   findStat = findStat:lower()
@@ -83,7 +101,7 @@ function WhoGotLootUtil.GetItemMainStat(mainStat, findStat)
   return foundStats[findStat]
 end
 
-function WhoGotLootUtil.SimplifyStatName(statName)
+function WGLUtil.SimplifyStatName(statName)
   if statName == "Versatility" then return "Vers"
   elseif statName == "Critical Strike" then return "Crit"
   elseif statName == "Haste" then return "Haste"

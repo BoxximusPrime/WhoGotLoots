@@ -36,7 +36,7 @@ function WhoLootsOptionsEntries.LoadOptions()
     end
 end
 
-WhoLootsOptionsFrame:SetBackdrop(WhoGotLootUtil.Backdrop)
+WhoLootsOptionsFrame:SetBackdrop(WGLUtil.Backdrop)
 WhoLootsOptionsFrame:SetBackdropColor(0.2, 0.2, 0.2, 1) -- Set the background color (RGBA)
 WhoLootsOptionsFrame:SetBackdropBorderColor(0, 0, 0, 1) -- Set the border color (RGBA)
 
