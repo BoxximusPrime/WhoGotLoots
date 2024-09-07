@@ -6,5 +6,6 @@
 ## SavedVariables: WhoGotLootsSavedData
 
 util.lua
+FrameManager.lua
 WhoGotLoots.lua
 OptionsMenu.lua
