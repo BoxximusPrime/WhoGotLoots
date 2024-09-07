@@ -134,6 +134,7 @@ function WhoGotLootsFrames:PrepareFrame(frame)
     frame.BottomText:ClearAllPoints()
     frame.BottomText:SetPoint("TOPLEFT", frame.ItemName, "BOTTOMLEFT", 0, -2)
     frame.Animating = false
+    frame.HoverAnimDelta = nil
 end
 
 -- Create an initial pool.

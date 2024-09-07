@@ -337,6 +337,8 @@ function AddLootFrame(player, itemLink)
                         if statName ~= nil then
                             if diff > 0 then
                                 table.insert(BottomText, "|cFF00FF00+" .. diff .. "|r " .. statName)
+                            -- elseif diff == 0 then
+                            --     table.insert(BottomText, "=" .. statName)
                             elseif diff < 0 then
                                 table.insert(BottomText, "|cFFFF0000" .. diff .. "|r " .. statName)
                             end
@@ -516,14 +518,16 @@ end
 MainFrame:SetScript("OnUpdate", function(self, elapsed)
 
     for i, frame in ipairs(WhoLootData.ActiveFrames) do
-        local progressBar = frame[1].ProgBar
-        local timer = frame[2]
-        if timer > 0 then
-            timer = timer - elapsed
-            progressBar:SetValue(timer / WhoLootData.DefaultDuration)
-            frame[2] = timer
-        else
-            FadeOutFrame(frame[1].Frame)
+        if frame[1].HoverAnimDelta == nil then 
+            local progressBar = frame[1].ProgBar
+            local timer = frame[2]
+            if timer > 0 then
+                timer = timer - elapsed
+                progressBar:SetValue(timer / WhoLootData.DefaultDuration)
+                frame[2] = timer
+            else
+                FadeOutFrame(frame[1].Frame)
+            end
         end
     end
 end)

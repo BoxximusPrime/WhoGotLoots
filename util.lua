@@ -102,8 +102,9 @@ function WGLUtil.GetItemMainStat(mainStat, findStat)
 end
 
 function WGLUtil.SimplifyStatName(statName)
+  print(statName)
   if statName == "Versatility" then return "Vers"
-  elseif statName == "Critical Strike" then return "Crit"
+  elseif statName == "Crit" then return "Crit"
   elseif statName == "Haste" then return "Haste"
   elseif statName == "Mastery" then return "Mast"
   elseif statName == "Agility" then return "Agi"
