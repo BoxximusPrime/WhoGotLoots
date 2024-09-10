@@ -1,38 +1,55 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-WhoLootData.DefaultDuration = 60 -- Default duration for each frame to be visible.
+
+WhoLootData.Version = "1.0.0 RC"
+
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
 
-MainFrame = CreateFrame("Frame", nil, nil, "BackdropTemplate")
-MainFrame.name = "WhoLoots"
-MainFrame:SetParent(UIParent)
-MainFrame:SetDontSavePosition(true)
-WhoLootData.MainFrame = MainFrame
+WhoLootData.MainFrame = WGLUICreator.CreateMainFrame()
+WhoLootData.MainFrame:SetParent(UIParent)
+WhoLootData.MainFrame:SetDontSavePosition(true)
+
+-- Create a frame that acts as a timer, which iterates through all active frames and hides them when their time is up.
+local TimerFrame = CreateFrame("Frame")
+TimerFrame:SetScript("OnUpdate", function(self, elapsed)
+    for i, frame in ipairs(WhoLootData.ActiveFrames) do
+        if frame.HoverAnimDelta == nil then
+            frame.Lifetime = frame.Lifetime - elapsed
+            frame.ProgressBar:SetValue(frame.Lifetime / WhoLootFrameData.FrameLifetime)
+            if frame.Lifetime <= 0 then
+                frame:FadeOut()
+            end
+        end
+    end
+end)
 
 -- Register Events --
-MainFrame:RegisterEvent("ADDON_LOADED"); -- Fired when saved variables are loaded
-MainFrame:RegisterEvent("ENCOUNTER_LOOT_RECEIVED")
+WhoLootData.MainFrame:RegisterEvent("ADDON_LOADED"); -- Fired when saved variables are loaded
+WhoLootData.MainFrame:RegisterEvent("ENCOUNTER_LOOT_RECEIVED")
 
 -- Handle Events --
-function MainFrame:OnEvent(event, arg1, arg2, arg3, arg4, arg5)
+function WhoLootData.MainFrame:OnEvent(event, arg1, arg2, arg3, arg4, arg5)
     if event == "ADDON_LOADED" and arg1 == "WhoGotLoots" then
 
         WhoGotLootsSavedData = WhoGotLootsSavedData or {}
         WhoLootsOptionsEntries.LoadOptions()
 
-        if WhoGotLootsSavedData.FirstBoot == false then MainFrame:Hide() end
+        if WhoGotLootsSavedData.FirstBoot == false then
+            WhoLootData.MainFrame:Close()
+        else
+            WhoLootData.MainFrame:LockWindow(false)
+        end
         WhoGotLootsSavedData.FirstBoot = false
 
         -- Set window scale.
         WhoLootData.MainFrame:SetScale(WhoGotLootsSavedData.SavedSize)
+        WhoLootData.MainFrame.cursorFrame:SetScale(WhoGotLootsSavedData.SavedSize)
 
         -- Set window position (we do this after loading the options, because the saved position is loaded in LoadOptions)
         if WhoGotLootsSavedData.SavedPos then
-            WhoLootData.MainFrame:ClearAllPoints()
-            WhoLootData.MainFrame:SetPoint(unpack(WhoGotLootsSavedData.SavedPos))
+            WhoLootData.MainFrame:Move(WhoGotLootsSavedData.SavedPos)
         else
-            WhoLootData.MainFrame:ClearAllPoints()
-            WhoLootData.MainFrame:SetPoint("CENTER", nil, "CENTER")
+            WhoLootData.MainFrame:Move({"CENTER", nil, "CENTER"})
         end
 
     elseif event == "ENCOUNTER_LOOT_RECEIVED" then
@@ -40,7 +57,7 @@ function MainFrame:OnEvent(event, arg1, arg2, arg3, arg4, arg5)
         AddLootFrame(arg5, itemLink)
     end
 end
-MainFrame:SetScript("OnEvent", MainFrame.OnEvent)
+WhoLootData.MainFrame:SetScript("OnEvent", WhoLootData.MainFrame.OnEvent)
 
 local function getGearItemLvl(slotName)
     local lvl = 0
@@ -87,6 +104,21 @@ local function GetItemSlotName(itemLink)
     return equipLocToSlotName[equipLoc]
 end
 
+-- Function to check if the player is in a raid instance
+local function IsPlayerInRaidInstance()
+    local inInstance, instanceType = IsInInstance()
+    if inInstance and instanceType == "raid" then
+        return true
+    else
+        return false
+    end
+end
+
+local function IsRaidLFR()
+    local _, _, difficultyID = GetInstanceInfo()
+    return difficultyID == 17
+end
+
 -- ======================================================================= --
 -- ======================================================================= --
 
@@ -94,20 +126,26 @@ end
 function AddLootFrame(player, itemLink)
 
     -- If it was our loot, don't show the frame.
-    if player == UnitName("player") then return end
+    if player == UnitName("player") and WhoGotLootsSavedData.ShowOwnLoot ~= true then return end
 
+    -- Are we in a raid, and should we show raid loot?
+    if (not WhoGotLootsSavedData.ShowRaidLoot and IsPlayerInRaidInstance()) or (WhoGotLootsSavedData.ShowRaidLoot and not WhoGotLootsSavedData.ShowDuringLFR and IsRaidLFR()) then
+        return
+    end
+
+    -- If the player is nil, set it to the player.
     if UnitClass(player) == nil then player = "player" end
 
     -- If we've ran out of frames, remove the oldest one.
-    if #WhoLootData.ActiveFrames >= WhoGotLootsNumFrames then
-        local frame = WhoLootData.ActiveFrames[1][1]
+    if #WhoLootData.ActiveFrames >= WGL_NumPooledFrames then
+        local frame = WhoLootData.ActiveFrames
         frame.InUse = false
         frame.Frame:Hide()
         table.remove(WhoLootData.ActiveFrames, 1)
     end
 
     -- Unhide the main window
-    MainFrame:Show()
+    WhoLootData.MainFrame:Open()
 
     if type(player) ~= "string" then player = tostring(player) end
 
@@ -134,6 +172,10 @@ function AddLootFrame(player, itemLink)
 
         local CanEquip = C_Item.DoesItemContainSpec(CompareItemID, select(3, UnitClass("player")))
         if not CanEquip and WhoGotLootsSavedData.HideUnequippable then
+            -- if there's no active frames, hide the main window.
+            if #WhoLootData.ActiveFrames == 0 then
+                WhoLootData.MainFrame:Close()
+            end
             return
         end
 
@@ -353,10 +395,21 @@ function AddLootFrame(player, itemLink)
                         local statName = WGLUtil.SimplifyStatName(stat)
 
                         if statName ~= nil then
-                            if diff > 0 then
-                                table.insert(BottomText, "|cFF00FF00+" .. diff .. "|r " .. statName)
-                            elseif diff < 0 then
-                                table.insert(BottomText, "|cFFFF0000" .. diff .. "|r " .. statName)
+
+                            -- Overrides for some stats.
+                            if(statName == "Indest") then
+                                if diff > 0 then
+                                    table.insert(BottomText, "|cFF00FF00+Indestructible|r")
+                                elseif diff < 0 then
+                                    table.insert(BottomText, "|cFFFF0000-Indestructible|r")
+                                end
+                            -- Normal stat display
+                            else
+                                if diff > 0 then
+                                    table.insert(BottomText, "|cFF00FF00+" .. diff .. "|r " .. statName)
+                                elseif diff < 0 then
+                                    table.insert(BottomText, "|cFFFF0000" .. diff .. "|r " .. statName)
+                                end
                             end
                         end
                     end
@@ -385,20 +438,16 @@ function AddLootFrame(player, itemLink)
 
         if frame then
             local playerClass = select(2, UnitClass(player))
-            frame.Player:SetText("|c" .. RAID_CLASS_COLORS[playerClass].colorStr .. player:sub(1, 10) .. "|r")
-            frame.ItemName:SetText("|c" .. select(4, GetItemQualityColor(itemQuality)) .. "[" .. itemName  .. "]" .. "|r")
-            frame.BottomText:SetText(table.concat(BottomText, "  "))
+            local playerName = { strsplit("-", player) }
+            frame.PlayerText:SetText("|c" .. RAID_CLASS_COLORS[playerClass].colorStr .. playerName[1]:sub(1, 10) .. "|r")
+            frame.ItemText:SetText("|c" .. select(4, GetItemQualityColor(itemQuality)) .. "[" .. itemName  .. "]" .. "|r")
+            frame.BottomText:SetText(table.concat(BottomText, ", "))
             frame.Icon:SetTexture(itemTexture)
-            frame.ProgBar:SetValue(0)
             frame.Item = itemLink
-            frame.InUse = true
-            frame.Frame:SetParent(MainFrame)
-            WhoGotLootsFrames:PrepareFrame(frame)
-            AnimateFrameScale(frame, 1.0, 0.2)
+            frame:DropIn(1.0, 0.2)
 
             -- Store the frame in the ChildFrames table.
-            WhoLootData.ActiveFrames[#WhoLootData.ActiveFrames + 1] = { frame, WhoLootData.DefaultDuration }
-
+            WhoLootData.ActiveFrames[#WhoLootData.ActiveFrames + 1] = frame
             WhoLootData.ResortFrames()
 
             -- Play a sound
@@ -413,51 +462,40 @@ end
 
 function WhoLootData.HoverFrame(fromFrame, toState)
 
-    -- Find the frame in the ActiveFrames table.
-    local frameData = nil
-    for i, frame in ipairs(WhoLootData.ActiveFrames) do
-        if frame[1].Frame == fromFrame then
-            frameData = frame[1]
-            break
-        end
-    end
-
-    if frameData == nil or frameData.Animating then return end
-
-    if frameData == nil then
+    if fromFrame == nil or fromFrame.Animating then return end
+    if fromFrame == nil then
         print("ERROR: Couldn't find the frame in the ActiveFrames table.")
         return
     end
 
     if toState then
-        GameTooltip:SetOwner(frameData.Frame, "ANCHOR_RIGHT")
-        GameTooltip:SetHyperlink(frameData.Item)
+        GameTooltip:SetOwner(fromFrame, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink(fromFrame.Item)
         GameTooltip:Show()
 
         -- On hover we're going to move some things over time.
-        frameData.Frame:SetScript("OnUpdate", function(self, elapsed)
+        fromFrame:SetScript("OnUpdate", function(self, elapsed)
 
-            if frameData.HoverAnimDelta == nil then frameData.HoverAnimDelta = 0 end
-            frameData.HoverAnimDelta = frameData.HoverAnimDelta + elapsed * 2
-            local progress = WGLUtil.Clamp(frameData.HoverAnimDelta / WhoLootFrameData.HoverAnimTime, 0, 1)
+            if fromFrame.HoverAnimDelta == nil then fromFrame.HoverAnimDelta = 0 end
+            fromFrame.HoverAnimDelta = fromFrame.HoverAnimDelta + elapsed * 2
+            local progress = WGLUtil.Clamp(fromFrame.HoverAnimDelta / WhoLootFrameData.HoverAnimTime, 0, 1)
             progress = math.sin(progress * math.pi / 2)
 
-            WGLUtil.LerpBackdropColor(frameData.Frame, WhoLootFrameData.HoverColor, WhoLootFrameData.ExitColor, 1 - progress)
+            WGLUtil.LerpBackdropColor(fromFrame.background, WhoLootFrameData.HoverColor, WhoLootFrameData.ExitColor, 1 - progress)
 
-            frameData.Player:SetAlpha(1 - progress)
-            frameData.Icon:ClearAllPoints()
-            frameData.Icon:SetPoint("TOPLEFT",
+            fromFrame.PlayerText:SetAlpha(1 - progress)
+            fromFrame.Icon:ClearAllPoints()
+            fromFrame.Icon:SetPoint("TOPLEFT",
                 WGLUtil.LerpFloat(WhoLootFrameData.IconStartLeftPos, WhoLootFrameData.IconEndLeftPos, progress), WhoLootFrameData.IconTopPos)
-            frameData.Icon:SetAlpha(1 - progress)
-            frameData.ItemName:ClearAllPoints()
-            frameData.ItemName:SetPoint("TOPLEFT",
+            fromFrame.Icon:SetAlpha(1 - progress)
+            fromFrame.ItemText:ClearAllPoints()
+            fromFrame.ItemText:SetPoint("TOPLEFT",
                 WGLUtil.LerpFloat(WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameEndLeftPos, progress), WhoLootFrameData.ItemNameTopPos)
-            frameData.BottomText:ClearAllPoints()
-            frameData.BottomText:SetPoint("TOPLEFT", frameData.ItemName, "BOTTOMLEFT", 0, -2)
-            
+            fromFrame.BottomText:ClearAllPoints()
+            fromFrame.BottomText:SetPoint("TOPLEFT", fromFrame.ItemText, "BOTTOMLEFT", 0, -2)
 
             if progress >= 1 then
-                frameData.Frame:SetScript("OnUpdate", nil) -- Stop the animation
+                fromFrame:SetScript("OnUpdate", nil) -- Stop the animation
             end
 
         end)
@@ -465,28 +503,28 @@ function WhoLootData.HoverFrame(fromFrame, toState)
         GameTooltip:Hide()
 
         -- On leave we're going to move some things back over time.
-        if frameData.HoverAnimDelta == nil then frameData.HoverAnimDelta = WhoLootFrameData.HoverAnimTime end
-        frameData.Frame:SetScript("OnUpdate", function(self, elapsed)
-            frameData.HoverAnimDelta = frameData.HoverAnimDelta - elapsed
-            local progress = WGLUtil.Clamp(frameData.HoverAnimDelta / WhoLootFrameData.HoverAnimTime, 0, 1)
+        if fromFrame.HoverAnimDelta == nil then fromFrame.HoverAnimDelta = WhoLootFrameData.HoverAnimTime end
+        fromFrame:SetScript("OnUpdate", function(self, elapsed)
+            fromFrame.HoverAnimDelta = fromFrame.HoverAnimDelta - elapsed
+            local progress = WGLUtil.Clamp(fromFrame.HoverAnimDelta / WhoLootFrameData.HoverAnimTime, 0, 1)
             progress = math.sin(progress * math.pi / 2)
 
-            WGLUtil.LerpBackdropColor(frameData.Frame, WhoLootFrameData.HoverColor, WhoLootFrameData.ExitColor, 1 - progress)
+            WGLUtil.LerpBackdropColor(fromFrame.background, WhoLootFrameData.HoverColor, WhoLootFrameData.ExitColor, 1 - progress)
 
-            frameData.Player:SetAlpha(1 - progress)
-            frameData.Icon:ClearAllPoints()
-            frameData.Icon:SetPoint("TOPLEFT",
+            fromFrame.PlayerText:SetAlpha(1 - progress)
+            fromFrame.Icon:ClearAllPoints()
+            fromFrame.Icon:SetPoint("TOPLEFT",
                 WGLUtil.LerpFloat(WhoLootFrameData.IconStartLeftPos, WhoLootFrameData.IconEndLeftPos, progress), WhoLootFrameData.IconTopPos)
-            frameData.Icon:SetAlpha(1 - progress)
-            frameData.ItemName:ClearAllPoints()
-            frameData.ItemName:SetPoint("TOPLEFT",
+            fromFrame.Icon:SetAlpha(1 - progress)
+            fromFrame.ItemText:ClearAllPoints()
+            fromFrame.ItemText:SetPoint("TOPLEFT",
                 WGLUtil.LerpFloat(WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameEndLeftPos, progress), WhoLootFrameData.ItemNameTopPos)
-            frameData.BottomText:ClearAllPoints()
-            frameData.BottomText:SetPoint("TOPLEFT", frameData.ItemName, "BOTTOMLEFT", 0, -2)
+            fromFrame.BottomText:ClearAllPoints()
+            fromFrame.BottomText:SetPoint("TOPLEFT", fromFrame.ItemText, "BOTTOMLEFT", 0, -2)
 
             if progress <= 0 then
-                frameData.Frame:SetScript("OnUpdate", nil) -- Stop the animation
-                frameData.HoverAnimDelta = nil
+                fromFrame:SetScript("OnUpdate", nil) -- Stop the animation
+                fromFrame.HoverAnimDelta = nil
             end
         end)
     end
@@ -499,183 +537,19 @@ function WhoLootData.ResortFrames()
     -- Loop through the in-use frames, and set their position starting at the top of the mainwindowbg.
     local numFrames = #WhoLootData.ActiveFrames
     for i, frame in ipairs(WhoLootData.ActiveFrames) do
-        frame[1].Frame:ClearAllPoints()
-        frame[1].Frame:SetPoint("TOPLEFT", 0, -20 - (i - 1) * 34 - 5)
+        frame:ClearAllPoints()
+        frame:SetPoint("TOP", WhoLootData.MainFrame, "BOTTOM", 0, (i - 1) * -36 + 3 )
     end
 
     -- If there are no frames to show, and the option is enabled, hide the main window.
-    if numFrames == 0 and WhoGotLootsSavedData.AutoCloseOnEmpty then
-        MainFrame:Hide()
+    if numFrames == 0 and WhoGotLootsSavedData.AutoCloseOnEmpty == true then
+        WhoLootData.MainFrame:Close()
     end
 end
-
-function FadeOutFrame(frame)
-    frame:SetScript("OnUpdate", function(self, elapsed)
-        frame.Animating = true
-        local alpha = self:GetAlpha()
-        if alpha > 0 then
-            local clamped = math.max(0, alpha - elapsed * 1.5)
-            self:SetAlpha(clamped)
-        else
-            -- Remove the frame from the ActiveFrames table.
-            for i, activeFrame in ipairs(WhoLootData.ActiveFrames) do
-                if activeFrame[1].Frame == frame then
-                    WhoLootData.ActiveFrames[i][1].InUse = false
-                    table.remove(WhoLootData.ActiveFrames, i)
-                    break
-                end
-            end
-            self:Hide()
-            self:SetScript("OnUpdate", nil)
-            WhoLootData.ResortFrames()
-        end
-    end)
-end
-
--- Attach a looping function to the OnUpdate event of the main frame.
-MainFrame:SetScript("OnUpdate", function(self, elapsed)
-
-    for i, frame in ipairs(WhoLootData.ActiveFrames) do
-        if frame[1].HoverAnimDelta == nil then 
-            local progressBar = frame[1].ProgBar
-            local timer = frame[2]
-            if timer > 0 then
-                timer = timer - elapsed
-                progressBar:SetValue(timer / WhoLootData.DefaultDuration)
-                frame[2] = timer
-            else
-                FadeOutFrame(frame[1].Frame)
-            end
-        end
-    end
-end)
-
--- Function to animate the scale of a frame.
-function AnimateFrameScale(frame, targetScale, duration)
-    frame.Animating = true
-    local startTime = GetTime()
-    local initialScale = 1.5
-    local scaleChange = targetScale - initialScale
-    frame.Frame:Show()
-    frame.Frame:SetAlpha(1)
-
-    frame.Frame:SetScript("OnUpdate", function(self, elapsed)
-        local currentTime = GetTime()
-        local progress = (currentTime - startTime) / duration
-
-        local startColor = { r = 1, g = 1, b = 1}
-        local endColor = { r = 0.15, g = 0.15, b = 0.15 }
-
-        if progress >= 1 then
-            frame.Frame:SetScale(targetScale)
-            frame.Frame:SetBackdropColor(endColor.r, endColor.g, endColor.b, 1)
-            frame.Frame:SetScript("OnUpdate", nil) -- Stop the animation
-            frame.Animating = false
-        else
-            local newScale = initialScale + (scaleChange * progress)
-            frame.Frame:SetScale(newScale)
-            frame.Frame:SetBackdropColor(startColor.r + (endColor.r - startColor.r) * progress, startColor.g + (endColor.g - startColor.g) * progress, startColor.b + (endColor.b - startColor.b) * progress, 1)
-        end
-    end)
-end
-
--- Create the parent frame
-MainFrame:SetSize(150, 25)
-MainFrame:SetMovable(true)
-MainFrame:EnableMouse(true)
-MainFrame:RegisterForDrag("LeftButton")
-MainFrame:SetScript("OnDragStart", MainFrame.StartMoving)
-
--- Record the window position.
-MainFrame:SetScript("OnDragStop", function(self)
-    self:StopMovingOrSizing()
-    local point, relativeTo, relativePoint, xOfs, yOfs = self:GetPoint()
-    WhoGotLootsSavedData.SavedPos = { point, relativeTo, relativePoint, xOfs, yOfs }
-end)
-
--- Apply the backdrop to the frame
-MainFrame:SetBackdrop(WGLUtil.Backdrop)
-MainFrame:SetBackdropColor(0.2, 0.2, 0.2, 1) -- Set the background color (RGBA)
-MainFrame:SetBackdropBorderColor(0, 0, 0, 1) -- Set the border color (RGBA)
-
--- Make the frame highlight when hovered over
-MainFrame:SetScript("OnEnter", function(self)
-    if WhoGotLootsSavedData.LockWindow then return end
-    self:SetBackdropBorderColor(0.2, 0.2, 0.2, 1) -- Set the border color (RGBA)
-    self:SetBackdropColor(0.4, 0.4, 0.4, 1)
-end)
-
-MainFrame:SetScript("OnLeave", function(self)
-    self:SetBackdropBorderColor(0, 0, 0, 1) -- Set the border color (RGBA)
-    self:SetBackdropColor(0.2, 0.2, 0.2, 1)
-end)
-
--- Create the title text
-local text = MainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-text:SetPoint("LEFT", 10, 0)
-text:SetJustifyH("LEFT")
-text:SetText("Who Got Loots")
-text:SetFont("Fonts\\FRIZQT__.TTF", 8, "")
-    text:SetTextColor(1, 1, 1)
-
--- Ensure the title text is properly anchored to the parent frame
-text:SetParent(MainFrame)
-
--- Add a button to close the window
-local closeBtn = CreateFrame("Button", nil, MainFrame, "UIPanelCloseButton")
-closeBtn:SetPoint("TOPRIGHT", MainFrame, "TOPRIGHT", -3, -5)
-closeBtn:SetSize(15, 15)
-closeBtn:SetScript("OnClick", function(self)
-    MainFrame:Hide()
-    WhoLootData.OptionsFrame:Hide()
-end)
-
--- Add a button to open the options menu
-local optionsBtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
-optionsBtn:SetPoint("TOPRIGHT", closeBtn, "TOPLEFT", -6, 0)
-optionsBtn:SetSize(15, 15)
-optionsBtn:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
-optionsBtn:SetScript("OnClick", function(self)
-    if WhoLootsOptionsFrame:IsVisible() then 
-        WhoLootsOptionsFrame:Hide()
-    else
-        -- Fade in the options frame, and make it slide into view.
-        WhoLootsOptionsFrame:Show()
-        WhoLootsOptionsFrame:SetAlpha(0)
-        WhoLootsOptionsFrame:ClearAllPoints()
-
-        -- Determine if we have enough space on the left side of the main frame.
-        local WhichPoint = "TOPRIGHT"
-        local frameWidth = MainFrame:GetWidth()
-        local optionsFrameWidth = WhoLootsOptionsFrame:GetWidth()
-        local screenWidth = GetScreenWidth()
-        local MainFrameX, MainFrameY = MainFrame:GetCenter()
-
-        if MainFrameX - optionsFrameWidth * MainFrame:GetScale() < 0 then
-            WhichPoint = "TOPLEFT"
-        end
-
-        WhoLootsOptionsFrame:SetFrameStrata("HIGH")
-        WhoLootsOptionsFrame:SetScript("OnUpdate", function(self, elapsed)
-            local alpha = self:GetAlpha()
-            if alpha < 1 then
-                local clamped = math.min(1, alpha + elapsed * 4)
-                self:SetAlpha(clamped)
-                if WhichPoint == "TOPRIGHT" then
-                    self:SetPoint(WhichPoint, MainFrame, "TOPLEFT", (1 - clamped) * -26, 0)
-                else
-                    self:SetPoint(WhichPoint, MainFrame, "TOPRIGHT", (1 - clamped) * 26, 0)
-                end
-            else
-                self:SetScript("OnUpdate", nil)
-            end
-        end)
-    end
-end)
 
 -- Add a button to add a random item.
-local debug_addrandombtn = CreateFrame("Button", nil, MainFrame, "UIPanelButtonTemplate")
-debug_addrandombtn:SetPoint("RIGHT", MainFrame, "TOPRIGHT", 60, 10)
+local debug_addrandombtn = CreateFrame("Button", nil, WhoLootData.MainFrame, "UIPanelButtonTemplate")
+debug_addrandombtn:SetPoint("RIGHT", WhoLootData.MainFrame, "TOPRIGHT", 60, 10)
 debug_addrandombtn:SetSize(100, 20)
 debug_addrandombtn:SetText("+ Random")
 debug_addrandombtn:SetScript("OnClick", function(self)
@@ -684,7 +558,8 @@ end)
 debug_addrandombtn:Hide()
 
 -- Define the slash commands
-SLASH_WHOLOOT1 = "/wholoots"
+SLASH_WHOLOOT1 = "/whogotloots"
+SLASH_WHOLOOT2 = "/wgl"
 
 -- Register the command handler
 SlashCmdList["WHOLOOT"] = function(msg, editbox)
@@ -706,10 +581,10 @@ SlashCmdList["WHOLOOT"] = function(msg, editbox)
             AddLootFrame("Andisae", itemLink)
         end
     else
-        if MainFrame:IsVisible() then
-            MainFrame:Hide()
+        if WhoLootData.MainFrame:IsVisible() then
+            WhoLootData.MainFrame:Close()
         else
-            MainFrame:Show()
+            WhoLootData.MainFrame:Open()
         end
     end
 end

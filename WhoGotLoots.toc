@@ -5,7 +5,11 @@
 
 ## SavedVariables: WhoGotLootsSavedData
 
+Art\Fonts.xml
+Art\UIElements.xml
+
 util.lua
+UICreator.lua
 FrameManager.lua
 WhoGotLoots.lua
 OptionsMenu.lua

@@ -70,7 +70,7 @@ function WGLUtil.LerpBackdropColor(frame, a, b, t)
   local green = WGLUtil.LerpFloat(a[2], b[2], t)
   local blue = WGLUtil.LerpFloat(a[3], b[3], t)
   local alpha = WGLUtil.LerpFloat(a[4], b[4], t)
-  frame:SetBackdropColor(red, green, blue, alpha)
+  WGLUICreator.ColorBGSlicedFrame(frame, "backdrop", red, green, blue, alpha)
 end
 
 function WGLUtil.Clamp(value, min, max)
@@ -115,4 +115,10 @@ function WGLUtil.SimplifyStatName(statName)
   elseif statName == "Speed" then return "Speed"
   elseif statName == "Indestructible" then return "Indest"
   else return nil end
+end
+
+function WGLUtil.SplitPlayerName(playerName)
+  local name, realm = playerName:match("([^%-]+)%-(.+)")
+  if realm == nil then return playerName, GetRealmName() end
+  return name, realm
 end
