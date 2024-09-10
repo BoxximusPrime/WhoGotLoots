@@ -45,15 +45,15 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.background = CreateFrame("Frame", nil, ItemFrame);
     ItemFrame.background:SetAllPoints(true);
     ItemFrame.background:SetFrameLevel(ItemFrame:GetFrameLevel());
-    WGLUICreator.SetUpSlice(ItemFrame.background, "ItemEntryBG", "backdrop", 0, nil)
-    WGLUICreator.ColorBGSlicedFrame(ItemFrame.background, "backdrop", 0.12, 0.1, 0.1, 0.85)
+    WGLUIBuilder.DrawSlicedBG(ItemFrame.background, "ItemEntryBG", "backdrop", 0, nil)
+    WGLUIBuilder.ColorBGSlicedFrame(ItemFrame.background, "backdrop", 0.12, 0.1, 0.1, 0.85)
 
     -- Create the border
     ItemFrame.border = CreateFrame("Frame", nil, ItemFrame);
     ItemFrame.border:SetAllPoints(true);
     ItemFrame.border:SetFrameLevel(ItemFrame:GetFrameLevel() + 1);
-    WGLUICreator.SetUpSlice(ItemFrame.border, "ItemEntryBorder", "border", 0, nil)
-    WGLUICreator.ColorBGSlicedFrame(ItemFrame.border, "border", 0.4, 0.4, 0.4, 1)
+    WGLUIBuilder.DrawSlicedBG(ItemFrame.border, "ItemEntryBorder", "border", 0, nil)
+    WGLUIBuilder.ColorBGSlicedFrame(ItemFrame.border, "border", 0.4, 0.4, 0.4, 1)
 
     -- Create a text showing which player it was.
     ItemFrame.PlayerText = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_Item_StatBottomText")
@@ -155,14 +155,14 @@ function WGL_FrameManager:CreateFrame()
     
             if progress >= 1 then
                 self:SetScale(targetScale)
-                WGLUICreator.ColorBGSlicedFrame(self.background, "backdrop", endColor[1], endColor[2], endColor[3], 1)
+                WGLUIBuilder.ColorBGSlicedFrame(self.background, "backdrop", endColor[1], endColor[2], endColor[3], 1)
                 self:SetScript("OnUpdate", nil) -- Stop the animation
                 self.Animating = false
     
             else
                 local newScale = initialScale + (scaleChange * progress)
                 self:SetScale(newScale)
-                WGLUICreator.ColorBGSlicedFrame(self.background, "backdrop",startColor[1] + (endColor[1] - startColor[1]) * progress, startColor[2] + (endColor[2] - startColor[2]) * progress, startColor[3] + (endColor[3] - startColor[3]) * progress, 1)
+                WGLUIBuilder.ColorBGSlicedFrame(self.background, "backdrop",startColor[1] + (endColor[1] - startColor[1]) * progress, startColor[2] + (endColor[2] - startColor[2]) * progress, startColor[3] + (endColor[3] - startColor[3]) * progress, 1)
             end
         end)
     end

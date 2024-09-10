@@ -89,16 +89,15 @@ end
 bg = CreateFrame("Frame", nil, WhoLootsOptionsFrame);
 bg:SetAllPoints(true);
 bg:SetFrameLevel(WhoLootsOptionsFrame:GetFrameLevel());
-WGLUICreator.SetUpSlice(bg, "genericChamferedBackground", "backdrop", 0, nil)
--- WGLUICreator.ColorBGSlicedFrame(bg, "backdrop", 0.078, 0.078, 0.078, 0.95)
-WGLUICreator.ColorBGSlicedFrame(bg, "backdrop", 0.06, 0.06, 0.05, 0.95)
+WGLUIBuilder.DrawSlicedBG(bg, "OptionsWindowBG", "backdrop", 0)
+WGLUIBuilder.ColorBGSlicedFrame(bg, "backdrop", 1, 1, 1, 0.95)
 
 -- Create the border
 border = CreateFrame("Frame", nil, WhoLootsOptionsFrame);
 border:SetAllPoints(true);
 border:SetFrameLevel(WhoLootsOptionsFrame:GetFrameLevel() + 1);
-WGLUICreator.SetUpSlice(border, "genericChamferedBorder", "border", 0, nil)
-WGLUICreator.ColorBGSlicedFrame(border, "border", 0.4, 0.4, 0.4, 1)
+WGLUIBuilder.DrawSlicedBG(border, "EdgedBorder", "border", 0)
+WGLUIBuilder.ColorBGSlicedFrame(border, "border", 0.4, 0.4, 0.4, 1)
 
 -- Create a title
 local title = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_Title")
@@ -107,7 +106,7 @@ title:SetText("Options")
 
 -- Chekcbox: Auto Close Window
 local autoClose = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
-WGLUICreator.AddOnClick(autoClose, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.AutoCloseOnEmpty = tick; end)
+WGLUIBuilder.AddOnClick(autoClose, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.AutoCloseOnEmpty = tick; end)
 autoClose:SetText("Auto Close")
 autoClose:SetParent(WhoLootsOptionsFrame)
 autoClose:SetPoint("TOPLEFT", title, "BOTTOMLEFT", -2, -16)
@@ -121,7 +120,7 @@ autoClose_Desc:SetParent(WhoLootsOptionsFrame)
 
 -- Checkbox: Lock Window
 local lockWindow = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
-WGLUICreator.AddOnClick(lockWindow, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.LockWindow = tick; WhoLootData.MainFrame:LockWindow(tick); end)
+WGLUIBuilder.AddOnClick(lockWindow, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.LockWindow = tick; WhoLootData.MainFrame:LockWindow(tick); end)
 lockWindow.Label:SetText("Lock Window")
 lockWindow:SetPoint("TOPLEFT", autoClose_Desc, "BOTTOMLEFT", -15, -16)
 lockWindow:SetParent(WhoLootsOptionsFrame)
@@ -134,7 +133,7 @@ lockWindow_Desc:SetParent(WhoLootsOptionsFrame)
 
 -- Checkbox: Show Own Loot
 local ShowOwnLoot = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
-WGLUICreator.AddOnClick(ShowOwnLoot, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowOwnLoot = tick; end)
+WGLUIBuilder.AddOnClick(ShowOwnLoot, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowOwnLoot = tick; end)
 ShowOwnLoot.Label:SetText("Show Own Loot")
 ShowOwnLoot:SetPoint("TOPLEFT", lockWindow_Desc, "BOTTOMLEFT", -15, -16)
 ShowOwnLoot:SetParent(WhoLootsOptionsFrame)
@@ -148,7 +147,7 @@ showOwnLoot_Desc:SetParent(WhoLootsOptionsFrame)
 
 -- Checkbox: Hide Unequippable Items
 local HideUnequippable = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
-WGLUICreator.AddOnClick(HideUnequippable, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.HideUnequippable = tick; end)
+WGLUIBuilder.AddOnClick(HideUnequippable, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.HideUnequippable = tick; end)
 HideUnequippable.Label:SetText("Hide Unequippable")
 HideUnequippable:SetPoint("TOPLEFT", showOwnLoot_Desc, "BOTTOMLEFT", -15, -16)
 HideUnequippable:SetParent(WhoLootsOptionsFrame)
@@ -161,7 +160,7 @@ hideUnequippable_Desc:SetParent(WhoLootsOptionsFrame)
 
 -- Checkbox: Show During Raid
 local ShowDuringRaid = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
-WGLUICreator.AddOnClick(ShowDuringRaid, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowDuringRaid = tick; end)
+WGLUIBuilder.AddOnClick(ShowDuringRaid, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowDuringRaid = tick; end)
 ShowDuringRaid.Label:SetText("Show During Raid")
 ShowDuringRaid:SetPoint("TOPLEFT", hideUnequippable_Desc, "BOTTOMLEFT", -15, -16)
 ShowDuringRaid:SetParent(WhoLootsOptionsFrame)
@@ -173,7 +172,7 @@ showDuringRaid_Desc:SetText("Show loot while in a raid.")
 
 -- CheckBox: Also show for LFR
 local ShowDuringLFR = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
-WGLUICreator.AddOnClick(ShowDuringLFR, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowDuringLFR = tick; end)
+WGLUIBuilder.AddOnClick(ShowDuringLFR, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowDuringLFR = tick; end)
 ShowDuringLFR.Label:SetText("Show During LFR")
 ShowDuringLFR:SetPoint("TOPLEFT", showDuringRaid_Desc, "BOTTOMLEFT", 0, -10)
 ShowDuringLFR:SetParent(WhoLootsOptionsFrame)
@@ -186,7 +185,7 @@ showDuringLFR_Desc:SetText("Show loot while in LFR.")
 
 -- Sound Toggle
 local SoundToggle = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
-WGLUICreator.AddOnClick(SoundToggle, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.SoundEnabled = tick; end)
+WGLUIBuilder.AddOnClick(SoundToggle, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.SoundEnabled = tick; end)
 SoundToggle.Label:SetText("Enable Sound")
 SoundToggle:SetPoint("TOPLEFT", showDuringLFR_Desc, "BOTTOMLEFT", -30, -16)
 SoundToggle:SetParent(WhoLootsOptionsFrame)
@@ -240,4 +239,4 @@ closeBtn:SetScript("OnClick", function(self)
     WhoLootsOptionsFrame:Hide()
 end)
 
---WhoLootsOptionsFrame:Hide()
+WhoLootsOptionsFrame:Hide()

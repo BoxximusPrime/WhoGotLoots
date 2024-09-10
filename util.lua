@@ -70,7 +70,7 @@ function WGLUtil.LerpBackdropColor(frame, a, b, t)
   local green = WGLUtil.LerpFloat(a[2], b[2], t)
   local blue = WGLUtil.LerpFloat(a[3], b[3], t)
   local alpha = WGLUtil.LerpFloat(a[4], b[4], t)
-  WGLUICreator.ColorBGSlicedFrame(frame, "backdrop", red, green, blue, alpha)
+  WGLUIBuilder.ColorBGSlicedFrame(frame, "backdrop", red, green, blue, alpha)
 end
 
 function WGLUtil.Clamp(value, min, max)
@@ -121,4 +121,13 @@ function WGLUtil.SplitPlayerName(playerName)
   local name, realm = playerName:match("([^%-]+)%-(.+)")
   if realm == nil then return playerName, GetRealmName() end
   return name, realm
+end
+
+function WGLUtil.CheckIfItemIsShown(itemLink, player)
+  for i, itemFrame in ipairs(WhoLootData.ActiveFrames) do
+    if itemFrame.Item == itemLink and itemFrame.Player == player then
+      return true
+    end
+  end
+  return false
 end

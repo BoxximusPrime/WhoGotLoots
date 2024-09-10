@@ -13,13 +13,6 @@
                         <Anchor point="TOPLEFT"/>
                     </Anchors>
                 </Texture>
-                <!-- <Texture setAllPoints="true">
-                    <Color r="0" g="0" b="0" a="0.9"/>
-                    <Size x="12.0" y="12.0"/>
-                    <Anchors>
-                        <Anchor point="TOPLEFT"/>
-                    </Anchors>
-                </Texture> -->
             </Layer>
             <Layer level="BORDER">
                 <Texture file="Interface\AddOns\WhoGotLoots\Art\checkbox_hover" Alpha="1" parentKey="Highlight" snapToPixelGrid="false" texelSnappingBias="0.0">
@@ -44,12 +37,6 @@
                 </Texture>
             </Layer>
         </Layers>
-        <!-- <HighlightTexture file="Interface\AddOns\WhoGotLoots\Art\checkbox_hover" parentKey="Highlight" snapToPixelGrid="false" texelSnappingBias="0.0">
-            <Size x="12.0" y="12.0"/>
-            <Anchors>
-                <Anchor point="TOPLEFT"/>
-            </Anchors>
-        </HighlightTexture> -->
         <Scripts>
             <OnLoad>
                 self.Checked = false

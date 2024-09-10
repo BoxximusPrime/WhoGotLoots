@@ -1,6 +1,6 @@
-WGLUICreator = WGLUICreator or {}
+WGLUIBuilder = WGLUIBuilder or {}
 
-function WGLUICreator.CreateMainFrame()
+function WGLUIBuilder.CreateMainFrame()
 
     -- Create the main frame.
     local mainFrame = CreateFrame("Frame", nil, UIParent)
@@ -9,21 +9,13 @@ function WGLUICreator.CreateMainFrame()
 
     -- Create the background texture
     local bgTexture = mainFrame:CreateTexture(nil, "BACKGROUND")
-    bgTexture:SetSize(250, 64)
-    bgTexture:SetPoint("CENTER", mainFrame, "CENTER", 0, -10)
+    bgTexture:SetSize(250, 125)
+    bgTexture:SetPoint("CENTER", mainFrame, "CENTER", 0, 0)
     bgTexture:SetTexture("Interface\\AddOns\\WhoGotLoots\\Art\\MainWindowBG.tga")
-
-    -- Create the title text (as a texture)
-    local titleTexture = mainFrame:CreateTexture(nil, "ARTWORK")
-    titleTexture:SetParent(mainFrame)
-    titleTexture:SetSize(280, 39)
-    titleTexture:SetPoint("CENTER", mainFrame, "CENTER", 0, -20)
-    titleTexture:SetTexture("Interface\\AddOns\\WhoGotLoots\\Art\\MainFrameTitle.png")
-    titleTexture:SetScale(0.4)
 
     -- Create the options btn.
     local optionsBtn = CreateFrame("Button", nil, mainFrame, "WGLOptionsBtn")
-    optionsBtn:SetPoint("TOPLEFT", mainFrame, "TOPRIGHT", 9, -30)
+    optionsBtn:SetPoint("TOPLEFT", mainFrame, "TOPRIGHT", 9, -27)
     optionsBtn:SetSize(12, 12)
     optionsBtn:SetScript("OnClick", function()
         WhoLootsOptionsEntries.OpenOptions()
@@ -42,7 +34,7 @@ function WGLUICreator.CreateMainFrame()
     -- Create a frame that captures the cursor's onEnter and onLeave events.
     -- This'll be useed to show the options and close buttons.
     mainFrame.cursorFrame = CreateFrame("Frame", nil, UIParent)
-    mainFrame.cursorFrame:SetSize(180, 60)
+    mainFrame.cursorFrame:SetSize(180, 40)
     mainFrame.cursorFrame:SetPoint("CENTER", 0, 0)
 
     -- Extend the frame to the edges of the screen.
@@ -52,7 +44,7 @@ function WGLUICreator.CreateMainFrame()
     mainFrame.cursorFrame.CursorOver = false
     mainFrame.cursorFrame.HoverAnimDelta = 1
     mainFrame.cursorFrame.MoveAmount = -60
-    mainFrame.cursorFrame.LastElapsed = 0
+    mainFrame.cursorFrame.LastElapsed = -1
     mainFrame.cursorFrame.IsDragging = false
 
     -- Make the main frame movable.
@@ -102,7 +94,7 @@ function WGLUICreator.CreateMainFrame()
         -- Make the options and close button swoop in from the right.
         local moveAmount = mainFrame.cursorFrame.MoveAmount * self.HoverAnimDelta
         moveAmount = math.sin(self.HoverAnimDelta * (math.pi * 0.5)) * moveAmount
-        optionsBtn:SetPoint("TOPLEFT", mainFrame, "TOPRIGHT", moveAmount + (self.MoveAmount * -1), -30)
+        optionsBtn:SetPoint("TOPLEFT", mainFrame, "TOPRIGHT", moveAmount + (self.MoveAmount * -1), -27)
         closeBtn:SetPoint("TOP", optionsBtn, "BOTTOM", 0, 30)
 
         -- Also make them fade in/out.
@@ -136,45 +128,47 @@ function WGLUICreator.CreateMainFrame()
         self.cursorFrame:SetMovable(not toState)
     end
 
-    WGLUICreator.SetUpSlice(mainFrame.cursorFrame, "genericChamferedBackground", "backdrop", 0, nil)
-    WGLUICreator.ColorBGSlicedFrame(mainFrame.cursorFrame, "backdrop", 1, 1, 1, 0.1)
+    WGLUIBuilder.DrawSlicedBG(mainFrame.cursorFrame, "SelectionBox", "backdrop", 0)
+    WGLUIBuilder.ColorBGSlicedFrame(mainFrame.cursorFrame, "backdrop", 1, 1, 1, 0.25)
 
     return mainFrame
 end
 
 FrameTextures =
 {
-    genericChamferedBackground = {
-        file = "GenericChamferedBackground",
+    OptionsWindowBG = {
+        file = "OptionsWindowBG",
         cornerSize = 12,
         cornerCoord = 0.25,
-        useCenterForAlignment = true,
     },
 
-    genericChamferedBorder = {
-        file = "GenericChamferedBorder",
+    EdgedBorder = {
+        file = "EdgedBorder",
         cornerSize = 12,
         cornerCoord = 0.25,
-        useCenterForAlignment = true,
     },
 
     ItemEntryBG = {
-        file = "GenericChamferedBackground_NoBorder",
-        cornerSize = 11,
+        file = "ItemBG",
+        cornerSize = 12,
         cornerCoord = 0.25,
-        useCenterForAlignment = true,
     },
 
     ItemEntryBorder = {
-        file = "GenericChamferedBorder",
-        cornerSize = 11,
+        file = "EdgedBorder",
+        cornerSize = 12,
         cornerCoord = 0.25,
-        useCenterForAlignment = true,
+    },
+
+    SelectionBox = {
+        file = "SelectionBox",
+        cornerSize = 14,
+        cornerCoord = 0.25,
     }
 }
 
 
-function WGLUICreator.SetUpSlice(frame, textureKey, layer, shrink, customLayerSubLevel)
+function WGLUIBuilder.DrawSlicedBG(frame, textureKey, layer, shrink)
     shrink = shrink or 0;
     local group, subLevel;
 
@@ -194,23 +188,18 @@ function WGLUICreator.SetUpSlice(frame, textureKey, layer, shrink, customLayerSu
         return
     end
 
-    if customLayerSubLevel then
-        subLevel = customLayerSubLevel;
-    end
-
     local data = FrameTextures[textureKey];
 
     local file = "Interface\\AddOns\\WhoGotLoots\\Art\\" .. data.file;
-    local size = data.cornerSize;
+    local cornerSize = data.cornerSize;
     local coord = data.cornerCoord;
-    local useCenterForAlignment = data.useCenterForAlignment;
-    local offset = size * (data.offsetRatio or 0);
-    local ORDER = {1, 3, 7, 9, 2, 4, 6, 8, 5};
+    local offset = cornerSize * (data.offsetRatio or 0);
+    local buildOrder = {1, 3, 7, 9, 2, 4, 6, 8, 5};
     local tex, key;
     local isNewTexture;
 
     for i = 1, 9 do
-        key = ORDER[i];
+        key = buildOrder[i];
         if not group[key] then
             group[key] = frame:CreateTexture(nil, "BACKGROUND", nil, subLevel);
             isNewTexture = true;
@@ -248,42 +237,25 @@ function WGLUICreator.SetUpSlice(frame, textureKey, layer, shrink, customLayerSu
             tex:SetTexCoord(coord, 1-coord, coord, 1-coord);
 
         else
-            tex:SetSize(size, size);
-
-            if useCenterForAlignment then
-                if key == 1 then
-                    tex:SetPoint("CENTER", frame, "TOPLEFT", shrink, -shrink);
-                    tex:SetTexCoord(0, coord, 0, coord);
-                elseif key == 3 then
-                    tex:SetPoint("CENTER", frame, "TOPRIGHT", -shrink, -shrink);
-                    tex:SetTexCoord(1-coord, 1, 0, coord);
-                elseif key == 7 then
-                    tex:SetPoint("CENTER", frame, "BOTTOMLEFT", shrink, shrink);
-                    tex:SetTexCoord(0, coord, 1-coord, 1);
-                elseif key == 9 then
-                    tex:SetPoint("CENTER", frame, "BOTTOMRIGHT", -shrink, shrink);
-                    tex:SetTexCoord(1-coord, 1, 1-coord, 1);
-                end
-            else
-                if key == 1 then
-                    tex:SetPoint("TOPLEFT", frame, "TOPLEFT", -offset + shrink, offset - shrink);
-                    tex:SetTexCoord(0, coord, 0, coord);
-                elseif key == 3 then
-                    tex:SetPoint("TOPRIGHT", frame, "TOPRIGHT", offset - shrink, offset - shrink);
-                    tex:SetTexCoord(1-coord, 1, 0, coord);
-                elseif key == 7 then
-                    tex:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", -offset + shrink, -offset + shrink);
-                    tex:SetTexCoord(0, coord, 1-coord, 1);
-                elseif key == 9 then
-                    tex:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", offset - shrink, -offset + shrink);
-                    tex:SetTexCoord(1-coord, 1, 1-coord, 1);
-                end
+            tex:SetSize(cornerSize, cornerSize);
+            if key == 1 then
+                tex:SetPoint("CENTER", frame, "TOPLEFT", shrink, -shrink);
+                tex:SetTexCoord(0, coord, 0, coord);
+            elseif key == 3 then
+                tex:SetPoint("CENTER", frame, "TOPRIGHT", -shrink, -shrink);
+                tex:SetTexCoord(1-coord, 1, 0, coord);
+            elseif key == 7 then
+                tex:SetPoint("CENTER", frame, "BOTTOMLEFT", shrink, shrink);
+                tex:SetTexCoord(0, coord, 1-coord, 1);
+            elseif key == 9 then
+                tex:SetPoint("CENTER", frame, "BOTTOMRIGHT", -shrink, shrink);
+                tex:SetTexCoord(1-coord, 1, 1-coord, 1);
             end
-        end
+    end
     end
 end
 
-function WGLUICreator.ColorBGSlicedFrame(frame, layer, r, g, b, a)
+function WGLUIBuilder.ColorBGSlicedFrame(frame, layer, r, g, b, a)
 
     if layer == "backdrop" then
         if not frame.backdropTextures then
@@ -303,7 +275,7 @@ function WGLUICreator.ColorBGSlicedFrame(frame, layer, r, g, b, a)
 end
 
 -- Utility function to add an OnClick handler while preserving the original
-function WGLUICreator.AddOnClick(button, newOnClick)
+function WGLUIBuilder.AddOnClick(button, newOnClick)
     local originalOnClick = button:GetScript("OnClick")
     button:SetScript("OnClick", function(self, ...)
         -- Call the original OnClick script

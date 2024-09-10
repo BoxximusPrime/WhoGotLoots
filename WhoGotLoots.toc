@@ -9,7 +9,7 @@ Art\Fonts.xml
 Art\UIElements.xml
 
 util.lua
-UICreator.lua
-FrameManager.lua
+UIBuilder.lua
+ItemBox.lua
 WhoGotLoots.lua
 OptionsMenu.lua

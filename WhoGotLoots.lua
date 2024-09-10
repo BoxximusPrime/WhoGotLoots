@@ -1,11 +1,11 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
 
-WhoLootData.Version = "1.0.0 RC"
+WhoLootData.Version = "1.0.0"
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
 
-WhoLootData.MainFrame = WGLUICreator.CreateMainFrame()
+WhoLootData.MainFrame = WGLUIBuilder.CreateMainFrame()
 WhoLootData.MainFrame:SetParent(UIParent)
 WhoLootData.MainFrame:SetDontSavePosition(true)
 
@@ -26,6 +26,7 @@ end)
 -- Register Events --
 WhoLootData.MainFrame:RegisterEvent("ADDON_LOADED"); -- Fired when saved variables are loaded
 WhoLootData.MainFrame:RegisterEvent("ENCOUNTER_LOOT_RECEIVED")
+WhoLootData.MainFrame:RegisterEvent("CHAT_MSG_LOOT")
 
 -- Handle Events --
 function WhoLootData.MainFrame:OnEvent(event, arg1, arg2, arg3, arg4, arg5)
@@ -52,8 +53,31 @@ function WhoLootData.MainFrame:OnEvent(event, arg1, arg2, arg3, arg4, arg5)
             WhoLootData.MainFrame:Move({"CENTER", nil, "CENTER"})
         end
 
+    elseif event == "CHAT_MSG_LOOT" then
+
+        local itemLink = ""
+
+        -- -- Grab the itemLink from the message.
+        -- if arg1:find("You receive loot") then
+        --     itemLink = arg1:match("receive loot: (.+)")
+        --     if  WGLUtil.CheckIfItemIsShown(itemLink, UnitName("player")) then return end
+        --     print("chat add: " .. itemLink)
+        --     AddLootFrame(UnitName("player"), itemLink)
+        -- end
+
+        -- -- Also check if others received loot.
+        -- if arg1:find("receives loot") then
+        --     local playerName = arg1:match("receives loot: (.+)")
+        --     itemLink = arg1:match("|Hitem:(.-)$")
+        --     -- remove the . from the end of the item link
+        --     itemLink = itemLink:sub(1, -2)
+        --     if  WGLUtil.CheckIfItemIsShown(itemLink, playerName) then return end
+        --     AddLootFrame(playerName, itemLink)
+        -- end
+
     elseif event == "ENCOUNTER_LOOT_RECEIVED" then
         local itemLink = arg3
+        if  WGLUtil.CheckIfItemIsShown(itemLink) then return end
         AddLootFrame(arg5, itemLink)
     end
 end
@@ -437,6 +461,7 @@ function AddLootFrame(player, itemLink)
         end
 
         if frame then
+            frame.Player = player
             local playerClass = select(2, UnitClass(player))
             local playerName = { strsplit("-", player) }
             frame.PlayerText:SetText("|c" .. RAID_CLASS_COLORS[playerClass].colorStr .. playerName[1]:sub(1, 10) .. "|r")
@@ -449,6 +474,13 @@ function AddLootFrame(player, itemLink)
             -- Store the frame in the ChildFrames table.
             WhoLootData.ActiveFrames[#WhoLootData.ActiveFrames + 1] = frame
             WhoLootData.ResortFrames()
+
+            -- Set a shift + click function to add the item link to the chat box.
+            frame:SetScript("OnMouseDown", function(self, button)
+                if IsShiftKeyDown() then
+                    ChatEdit_InsertLink(itemLink)
+                end
+            end)
 
             -- Play a sound
             if WhoGotLootsSavedData.SoundEnabled == true or WhoGotLootsSavedData.SoundEnabled == nil then
@@ -538,7 +570,7 @@ function WhoLootData.ResortFrames()
     local numFrames = #WhoLootData.ActiveFrames
     for i, frame in ipairs(WhoLootData.ActiveFrames) do
         frame:ClearAllPoints()
-        frame:SetPoint("TOP", WhoLootData.MainFrame, "BOTTOM", 0, (i - 1) * -36 + 3 )
+        frame:SetPoint("TOP", WhoLootData.MainFrame, "BOTTOM", 0, (i - 1) * -36 + 6 )
     end
 
     -- If there are no frames to show, and the option is enabled, hide the main window.
@@ -547,38 +579,21 @@ function WhoLootData.ResortFrames()
     end
 end
 
--- Add a button to add a random item.
-local debug_addrandombtn = CreateFrame("Button", nil, WhoLootData.MainFrame, "UIPanelButtonTemplate")
-debug_addrandombtn:SetPoint("RIGHT", WhoLootData.MainFrame, "TOPRIGHT", 60, 10)
-debug_addrandombtn:SetSize(100, 20)
-debug_addrandombtn:SetText("+ Random")
-debug_addrandombtn:SetScript("OnClick", function(self)
-    AddLootFrame("Andisae", 212407)
-end)
-debug_addrandombtn:Hide()
-
 -- Define the slash commands
 SLASH_WHOLOOT1 = "/whogotloots"
 SLASH_WHOLOOT2 = "/wgl"
 
 -- Register the command handler
 SlashCmdList["WHOLOOT"] = function(msg, editbox)
-    if msg == "debug" then
-        if debug_addrandombtn:IsVisible() then
-            debug_addrandombtn:Hide()
-        else
-            debug_addrandombtn:Show()
-        end
-        print("Debug mode is now " .. (debug_addrandombtn:IsVisible() and "enabled" or "disabled") .. ".")
-    elseif msg:sub(1, 3) == "add" then
+    if msg:sub(1, 3) == "add" then
         local itemID = tonumber(msg:sub(5))
         
         if itemID then
-            AddLootFrame("Andisae", itemID)
+            AddLootFrame(GetUnitName("player"), itemID)
         else
             -- Try parsing it as an itemLink.
             local itemLink = msg:sub(5)
-            AddLootFrame("Andisae", itemLink)
+            AddLootFrame(GetUnitName("player"), itemLink)
         end
     else
         if WhoLootData.MainFrame:IsVisible() then
