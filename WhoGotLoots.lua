@@ -1,7 +1,7 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
 
-WhoLootData.Version = "1.0.0"
+WhoLootData.Version = "1.0.1"
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
 
@@ -52,6 +52,9 @@ function WhoLootData.MainFrame:OnEvent(event, ...)
             WhoLootData.MainFrame:Move({"CENTER", nil, "CENTER"})
         end
     elseif event == "CHAT_MSG_LOOT" then 
+
+        -- Does the message have the words "receive loot" or "receives loot" in it?
+        if not string.find(args[1], "receives? loot") then return end
 
         -- Scrape the message for the item link. Item links look like "|cffffffff|Hitem:2589::::::::20:257::::::|h[Linen Cloth]|h|rx2.",
         -- and we can use a pattern to extract it.

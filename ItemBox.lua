@@ -106,7 +106,7 @@ function WGL_FrameManager:CreateFrame()
     close:SetScript("OnClick", function(self)
         PlaySound(856)
         self.ParentFrame:Hide()
-        self.InUse = false
+        self.ParentFrame.InUse = false
 
         -- Find this frame in WhoLootData.ActiveFrames and remove it.
         for i, activeFrame in ipairs(WhoLootData.ActiveFrames) do
