@@ -126,24 +126,18 @@ end
 -- Function to add a loot frame to the main window.
 function AddLootFrame(player, itemLink)
 
-    print("from player " .. player)
-
     -- Is the item at least rare qualty?
     local itemQuality = select(3, GetItemInfo(itemLink))
 
     -- Does the player name have their realm? Check for a -
     if string.find(player, "-") then
-        print("removing realm")
         player = string.match(player, "(.*)-")
     end
 
     -- If it was our loot, don't show the frame.
     if player == UnitName("player") and WhoGotLootsSavedData.ShowOwnLoot ~= true then
-        print("skipping cause it's our loot")
         return
     end
-
-    print("Item link: " .. itemLink)
 
     -- Are we in a raid, and should we show raid loot?
     local isInRaid = IsPlayerInRaidInstance()
