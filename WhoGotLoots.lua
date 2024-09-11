@@ -25,13 +25,12 @@ end)
 
 -- Register Events --
 WhoLootData.MainFrame:RegisterEvent("ADDON_LOADED"); -- Fired when saved variables are loaded
-WhoLootData.MainFrame:RegisterEvent("ENCOUNTER_LOOT_RECEIVED")
 WhoLootData.MainFrame:RegisterEvent("CHAT_MSG_LOOT")
 
 -- Handle Events --
-function WhoLootData.MainFrame:OnEvent(event, arg1, arg2, arg3, arg4, arg5)
-    if event == "ADDON_LOADED" and arg1 == "WhoGotLoots" then
-
+function WhoLootData.MainFrame:OnEvent(event, ...)
+    local args = {...}
+    if event == "ADDON_LOADED" and args[1] == "WhoGotLoots" then
         WhoGotLootsSavedData = WhoGotLootsSavedData or {}
         WhoLootsOptionsEntries.LoadOptions()
 
@@ -52,33 +51,15 @@ function WhoLootData.MainFrame:OnEvent(event, arg1, arg2, arg3, arg4, arg5)
         else
             WhoLootData.MainFrame:Move({"CENTER", nil, "CENTER"})
         end
+    elseif event == "CHAT_MSG_LOOT" then 
 
-    elseif event == "CHAT_MSG_LOOT" then
-
-        local itemLink = ""
-
-        -- -- Grab the itemLink from the message.
-        -- if arg1:find("You receive loot") then
-        --     itemLink = arg1:match("receive loot: (.+)")
-        --     if  WGLUtil.CheckIfItemIsShown(itemLink, UnitName("player")) then return end
-        --     print("chat add: " .. itemLink)
-        --     AddLootFrame(UnitName("player"), itemLink)
-        -- end
-
-        -- -- Also check if others received loot.
-        -- if arg1:find("receives loot") then
-        --     local playerName = arg1:match("receives loot: (.+)")
-        --     itemLink = arg1:match("|Hitem:(.-)$")
-        --     -- remove the . from the end of the item link
-        --     itemLink = itemLink:sub(1, -2)
-        --     if  WGLUtil.CheckIfItemIsShown(itemLink, playerName) then return end
-        --     AddLootFrame(playerName, itemLink)
-        -- end
-
-    elseif event == "ENCOUNTER_LOOT_RECEIVED" then
-        local itemLink = arg3
-        if  WGLUtil.CheckIfItemIsShown(itemLink) then return end
-        AddLootFrame(arg5, itemLink)
+        -- Scrape the message for the item link. Item links look like "|cffffffff|Hitem:2589::::::::20:257::::::|h[Linen Cloth]|h|rx2.",
+        -- and we can use a pattern to extract it.
+        local message = args[1]
+        local itemLink = message:match("|c.-|Hitem:.-|h.-|h|r")
+        if itemLink then
+            AddLootFrame(args[2], itemLink)
+        end
     end
 end
 WhoLootData.MainFrame:SetScript("OnEvent", WhoLootData.MainFrame.OnEvent)
@@ -120,7 +101,7 @@ local function GetItemSlotName(itemLink)
         INVTYPE_HOLDABLE = "SecondaryHandSlot",
         INVTYPE_RANGED = "RangedSlot",
         INVTYPE_THROWN = "RangedSlot",
-        INVTYPE_RANGEDRIGHT = "RangedSlot",
+        INVTYPE_RANGEDRIGHT = "MainHandSlot",
         INVTYPE_RELIC = "RangedSlot",
         INVTYPE_TABARD = "TabardSlot",
         INVTYPE_BODY = "ShirtSlot"
@@ -131,11 +112,7 @@ end
 -- Function to check if the player is in a raid instance
 local function IsPlayerInRaidInstance()
     local inInstance, instanceType = IsInInstance()
-    if inInstance and instanceType == "raid" then
-        return true
-    else
-        return false
-    end
+    return inInstance and instanceType == "raid"
 end
 
 local function IsRaidLFR()
@@ -149,11 +126,29 @@ end
 -- Function to add a loot frame to the main window.
 function AddLootFrame(player, itemLink)
 
+    print("from player " .. player)
+
+    -- Is the item at least rare qualty?
+    local itemQuality = select(3, GetItemInfo(itemLink))
+
+    -- Does the player name have their realm? Check for a -
+    if string.find(player, "-") then
+        print("removing realm")
+        player = string.match(player, "(.*)-")
+    end
+
     -- If it was our loot, don't show the frame.
-    if player == UnitName("player") and WhoGotLootsSavedData.ShowOwnLoot ~= true then return end
+    if player == UnitName("player") and WhoGotLootsSavedData.ShowOwnLoot ~= true then
+        print("skipping cause it's our loot")
+        return
+    end
+
+    print("Item link: " .. itemLink)
 
     -- Are we in a raid, and should we show raid loot?
-    if (not WhoGotLootsSavedData.ShowRaidLoot and IsPlayerInRaidInstance()) or (WhoGotLootsSavedData.ShowRaidLoot and not WhoGotLootsSavedData.ShowDuringLFR and IsRaidLFR()) then
+    local isInRaid = IsPlayerInRaidInstance()
+    if (WhoGotLootsSavedData.ShowDuringRaid ~= true and isInRaid) or 
+        (isInRaid and WhoGotLootsSavedData.ShowDuringRaid == true and WhoGotLootsSavedData.ShowDuringLFR ~= true and IsRaidLFR()) then
         return
     end
 
@@ -167,9 +162,6 @@ function AddLootFrame(player, itemLink)
         frame.Frame:Hide()
         table.remove(WhoLootData.ActiveFrames, 1)
     end
-
-    -- Unhide the main window
-    WhoLootData.MainFrame:Open()
 
     if type(player) ~= "string" then player = tostring(player) end
 
@@ -188,6 +180,11 @@ function AddLootFrame(player, itemLink)
         local CompareItemID = C_Item.GetItemIDForItemInfo(itemLink)
         local efectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemLink)
         local itemName, linkedItem, itemQuality, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expansionID, setID, isCraftingReagent = C_Item.GetItemInfo(itemLink)
+
+        if itemQuality < 3 then return end
+        
+        -- Unhide the main window
+        WhoLootData.MainFrame:Open()
 
         -- If itemLink was a number, we need to get the itemLink from the Item object.
         if type(itemLink) == "number" then
@@ -215,7 +212,8 @@ function AddLootFrame(player, itemLink)
                 table.insert(BottomText, "|cFFFF0000Level " .. itemMinLevel .. "|r")
             end
 
-            local slotID = GetInventorySlotInfo(GetItemSlotName(itemLink))
+            local slotName = GetItemSlotName(itemLink)
+            local slotID = GetInventorySlotInfo(slotName)
             local OurILVL = 0
             local CurrentItemLink = nil
             local Skip = false
@@ -368,7 +366,7 @@ function AddLootFrame(player, itemLink)
                 end
 
                 -- If the item level is the same as what we have now, give a quick stat change breakdown.
-                if ilvlDiff == 0 and not (itemEquipLoc == "INVTYPE_HOLDABLE" and itemEquipLoc == "INVTYPE_WEAPONOFFHAND") then
+                if itemEquipLoc ~= "INVTYPE_HOLDABLE" and itemEquipLoc ~= "INVTYPE_WEAPONOFFHAND" then
                     local stats = {
                         Haste = { ours = 0, theirs = 0 },
                         Mastery = { ours = 0, theirs = 0 },
@@ -463,8 +461,7 @@ function AddLootFrame(player, itemLink)
         if frame then
             frame.Player = player
             local playerClass = select(2, UnitClass(player))
-            local playerName = { strsplit("-", player) }
-            frame.PlayerText:SetText("|c" .. RAID_CLASS_COLORS[playerClass].colorStr .. playerName[1]:sub(1, 10) .. "|r")
+            frame.PlayerText:SetText("|c" .. RAID_CLASS_COLORS[playerClass].colorStr .. player:sub(1, 8) .. "|r")
             frame.ItemText:SetText("|c" .. select(4, GetItemQualityColor(itemQuality)) .. "[" .. itemName  .. "]" .. "|r")
             frame.BottomText:SetText(table.concat(BottomText, ", "))
             frame.Icon:SetTexture(itemTexture)
