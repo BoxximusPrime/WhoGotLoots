@@ -176,9 +176,7 @@ function AddLootFrame(player, itemLink)
         local itemName, linkedItem, itemQuality, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expansionID, setID, isCraftingReagent = C_Item.GetItemInfo(itemLink)
 
         if itemQuality < 3 then return end
-        
-        -- Unhide the main window
-        WhoLootData.MainFrame:Open()
+    
 
         -- If itemLink was a number, we need to get the itemLink from the Item object.
         if type(itemLink) == "number" then
@@ -200,6 +198,9 @@ function AddLootFrame(player, itemLink)
 
         -- If we can equip this item, check if it's an upgrade.
         if CanEquip then
+
+            -- Unhide the main window
+            WhoLootData.MainFrame:Open()
 
             -- First, check if we're at the minimum character level.
             if UnitLevel("player") < itemMinLevel then
