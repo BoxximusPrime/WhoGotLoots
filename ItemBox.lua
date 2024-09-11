@@ -86,7 +86,7 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.ItemText:SetParent(ItemFrame)
 
     ItemFrame.BottomText = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_Item_StatBottomText")
-    ItemFrame.BottomText:SetPoint("TOPLEFT", itemText, "BOTTOMLEFT", 0, -2)
+    ItemFrame.BottomText:SetPoint("TOPLEFT", itemText, "BOTTOMLEFT", 0, -4)
     ItemFrame.BottomText:SetParent(ItemFrame)
     ItemFrame.BottomText:SetText("Bottom Text")
 
@@ -130,7 +130,7 @@ function WGL_FrameManager:CreateFrame()
         self.ItemText:ClearAllPoints()
         self.ItemText:SetPoint("TOPLEFT", WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameTopPos)
         self.BottomText:ClearAllPoints()
-        self.BottomText:SetPoint("TOPLEFT", ItemFrame.ItemText, "BOTTOMLEFT", 0, -2)
+        self.BottomText:SetPoint("TOPLEFT", ItemFrame.ItemText, "BOTTOMLEFT", 0, -4)
         self.Animating = false
         self.HoverAnimDelta = nil
         self.Lifetime = WhoLootFrameData.FrameLifetime
@@ -146,6 +146,8 @@ function WGL_FrameManager:CreateFrame()
         local scaleChange = targetScale - initialScale
         self:Show()
         self:SetAlpha(1)
+        self.PlayerText:SetAlpha(1)
+        self.PlayerText:Show()
     
         self:SetScript("OnUpdate", function(self, elapsed)
             local currentTime = GetTime()

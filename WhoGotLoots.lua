@@ -175,12 +175,11 @@ function AddLootFrame(player, itemLink)
 
     CompareItem:ContinueOnItemLoad(function()
         local CompareItemID = C_Item.GetItemIDForItemInfo(itemLink)
-        local efectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemLink)
+        local CompareItemIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemLink)
         local itemName, linkedItem, itemQuality, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expansionID, setID, isCraftingReagent = C_Item.GetItemInfo(itemLink)
 
         if itemQuality < 3 then return end
     
-
         -- If itemLink was a number, we need to get the itemLink from the Item object.
         if type(itemLink) == "number" then
             itemLink = linkedItem
@@ -202,124 +201,88 @@ function AddLootFrame(player, itemLink)
         -- If we can equip this item, check if it's an upgrade.
         if CanEquip then
 
-            -- Unhide the main window
-            WhoLootData.MainFrame:Open()
-
             -- First, check if we're at the minimum character level.
             if UnitLevel("player") < itemMinLevel then
                 table.insert(BottomText, "|cFFFF0000Level " .. itemMinLevel .. "|r")
             end
 
             local slotName = GetItemSlotName(itemLink)
-            local slotID = GetInventorySlotInfo(slotName)
-            local OurILVL = 0
-            local CurrentItemLink = nil
+            local slotID, _ = GetInventorySlotInfo(slotName)
+            local ItemLoc = ItemLocation:CreateFromEquipmentSlot(slotID)
+            local CurrentItemIlvl = ItemLoc and ItemLoc:IsValid() and C_Item.GetCurrentItemLevel(ItemLoc) or 0
+            local CurrentItemLink = GetInventoryItemLink("player", slotID)
             local Skip = false
 
             -- If this is a trinket, find the lowest ilvl trinket we have.
             if itemEquipLoc == "INVTYPE_TRINKET" then
                 local trinket1 = GetInventoryItemLink("player", 13)
-                local trinket2 =  GetInventoryItemLink("player", 14)
-
+                local trinket2 = GetInventoryItemLink("player", 14)
                 local trinket1id = select(1, C_Item.GetItemInfoInstant(trinket1))
                 local trinket2id = select(1, C_Item.GetItemInfoInstant(trinket2))
+                local trinket1Ilvl = trinket1 and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(13)) or 0
+                local trinket2Ilvl = trinket2 and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(14)) or 0
+
+                local trinketSlot = trinket1Ilvl < trinket2Ilvl and 13 or 14
 
                 -- Quick check to see if we have the same trinket.
                 if CompareItemID == trinket1id or CompareItemID == trinket2id then
                     -- If we have the same trinket, but it's at a lower ilvl, we want to show it.
-                    if trinket1id == CompareItemID then
-                        if C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(13)) < efectiveIlvl then
-                            Skip = false
-                        else
-                            Skip = true
-                        end
-                    elseif trinket2id == CompareItemID then
-                        if C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(14)) < efectiveIlvl then
-                            Skip = false
-                        else
-                            Skip = true
-                        end
+                    local trinketSlot = (trinket1id == CompareItemID) and 13 or 14
+                    if C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(trinketSlot)) < CompareItemIlvl then
+                        Skip = false
+                    else
+                        Skip = true
                     end
                 end
 
-                local trinket1Ilvl = 0
-                local trinket2Ilvl = 0
-                if trinket1 then
-                    trinket1Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(13))
-                end
-                if trinket2 then
-                    trinket2Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(14))
-                end
-                OurILVL = math.min(trinket1Ilvl, trinket2Ilvl)
-
-                CurrentItemLink = trinket1Ilvl < trinket2Ilvl and trinket1 or trinket2
+                CurrentItemIlvl = math.min(trinket1Ilvl, trinket2Ilvl)
+                CurrentItemLink = (trinket1Ilvl < trinket2Ilvl) and trinket1 or trinket2
+                slotID = trinketSlot
 
             -- Same for ring
             elseif itemEquipLoc == "INVTYPE_FINGER" then
                 local ring1 = GetInventoryItemLink("player", 11)
                 local ring2 = GetInventoryItemLink("player", 12)
+                local ring1id = ring1 and select(1, C_Item.GetItemInfoInstant(ring1)) or nil
+                local ring2id = ring2 and select(1, C_Item.GetItemInfoInstant(ring2)) or nil
+                local ring1Ilvl = ring1id and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(11)) or 0
+                local ring2Ilvl = ring2id and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(12)) or 0
 
-                local ring1id = select(1, C_Item.GetItemInfoInstant(ring1))
-                local ring2id = select(1, C_Item.GetItemInfoInstant(ring2))
+                local ringSlot = ring1Ilvl < ring2Ilvl and 11 or 12
 
                 -- Quick check to see if we have the same ring.
                 if CompareItemID == ring1id or CompareItemID == ring2id then
                     -- If we have the same ring, but it's at a lower ilvl, we want to show it.
-                    if ring1id == CompareItemID then
-                        if C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(11)) < efectiveIlvl then
-                            Skip = false
-                        else
-                            Skip = true
-                        end
-                    elseif ring2id == CompareItemID then
-                        if C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(12)) < efectiveIlvl then
-                            Skip = false
-                        else
-                            Skip = true
-                        end
+                    ringSlot = (ring1id == CompareItemID) and 11 or 12
+                    if C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(ringSlot)) < CompareItemIlvl then
+                        Skip = false
+                    else
+                        Skip = true
                     end
                 end
 
-                local ring1Ilvl = 0
-                local ring2Ilvl = 0
-                if ring1 then
-                    ring1Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(11))
-                end
-                if ring2 then
-                    ring2Ilvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(12))
-                end
-                OurILVL = math.min(ring1Ilvl, ring2Ilvl)
-
-                CurrentItemLink = ring1Ilvl < ring2Ilvl and ring1 or ring2
+                CurrentItemIlvl = math.min(ring1Ilvl, ring2Ilvl)
+                CurrentItemLink = (ring1Ilvl < ring2Ilvl) and ring1 or ring2
+                slotID = ringSlot
 
             -- If it's an offhand, we want to compare it to the main hand.
             elseif itemEquipLoc == "INVTYPE_HOLDABLE" or itemEquipLoc == "INVTYPE_WEAPONOFFHAND" then
                 slotID = 16
-                OurILVL = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(slotID))
                 CurrentItemLink = GetInventoryItemLink("player", slotID)
                 table.insert(BottomText, "Mainhand:")
-
-            -- Normal comparison.
-            else
-                CurrentItemLink = GetInventoryItemLink("player", GetItemSlotName(itemLink))
             end
+
 
             if not Skip then
 
-                -- Compare Against the item we have in the same slot.
-                local IsNotArmor = ItemType == "Trinket" or ItemType == "Ring" or ItemType == "Weapon" or ItemType == "Neck" or ItemType == "Cloak"
-
-                -- Check if this is an armor piece.
-                if CurrentItemLink then 
-                    OurILVL = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(slotID))
-                end
-
                 -- Show the ilvl diff if any
-                local ilvlDiff = efectiveIlvl - OurILVL
+                local ilvlDiff = CompareItemIlvl - CurrentItemIlvl
                 if ilvlDiff > 0 then
                     table.insert(BottomText, "|cFF00FF00+" .. ilvlDiff .. "|r ilvl")
                 elseif ilvlDiff < 0 then
                     table.insert(BottomText, "|cFFFF0000" .. ilvlDiff .. "|r ilvl")
+                else
+                    table.insert(BottomText, "Same Ilvl")
                 end
 
                 -- Next, figure out which stat is relevant to us. Get the player's main stats, and find the highest one.
@@ -394,17 +357,19 @@ function AddLootFrame(player, itemLink)
                     end
 
                     -- Get the stats of our currently equipped item.
-                    local ourItemStats = C_Item.GetItemStats(CurrentItemLink)
-                    for stat, value in pairs(ourItemStats) do
-                        if stat == "ITEM_MOD_HASTE_RATING_SHORT" then stats.Haste.ours = value
-                        elseif stat == "ITEM_MOD_MASTERY_RATING_SHORT" then stats.Mastery.ours = value
-                        elseif stat == "ITEM_MOD_VERSATILITY" then stats.Versatility.ours = value
-                        elseif stat == "ITEM_MOD_CRIT_RATING_SHORT" then stats.Crit.ours = value
-                        elseif stat == "ITEM_MOD_VERSATILITY" then stats.Vers.ours = value
-                        elseif stat == "ITEM_MOD_CR_AVOIDANCE_SHORT" then stats.Avoidance.ours = value
-                        elseif stat == "ITEM_MOD_CR_LIFESTEAL_SHORT" then stats.Leech.ours = value
-                        elseif stat == "ITEM_MOD_CR_SPEED_SHORT" then stats.Speed.ours = value
-                        elseif stat == "ITEM_MOD_CR_STURDINESS_SHORT" then stats.Indestructible.ours = value
+                    if CurrentItemLink then 
+                        local ourItemStats = C_Item.GetItemStats(CurrentItemLink)
+                        for stat, value in pairs(ourItemStats) do
+                            if stat == "ITEM_MOD_HASTE_RATING_SHORT" then stats.Haste.ours = value
+                            elseif stat == "ITEM_MOD_MASTERY_RATING_SHORT" then stats.Mastery.ours = value
+                            elseif stat == "ITEM_MOD_VERSATILITY" then stats.Versatility.ours = value
+                            elseif stat == "ITEM_MOD_CRIT_RATING_SHORT" then stats.Crit.ours = value
+                            elseif stat == "ITEM_MOD_VERSATILITY" then stats.Vers.ours = value
+                            elseif stat == "ITEM_MOD_CR_AVOIDANCE_SHORT" then stats.Avoidance.ours = value
+                            elseif stat == "ITEM_MOD_CR_LIFESTEAL_SHORT" then stats.Leech.ours = value
+                            elseif stat == "ITEM_MOD_CR_SPEED_SHORT" then stats.Speed.ours = value
+                            elseif stat == "ITEM_MOD_CR_STURDINESS_SHORT" then stats.Indestructible.ours = value
+                            end
                         end
                     end
 
@@ -457,9 +422,14 @@ function AddLootFrame(player, itemLink)
         end
 
         if frame then
+
+            -- Unhide the main window
+            WhoLootData.MainFrame:Open()
+
             frame.Player = player
             local playerClass = select(2, UnitClass(player))
             frame.PlayerText:SetText("|c" .. RAID_CLASS_COLORS[playerClass].colorStr .. player:sub(1, 8) .. "|r")
+            frame.PlayerText:Show()
             frame.ItemText:SetText("|c" .. select(4, GetItemQualityColor(itemQuality)) .. "[" .. itemName  .. "]" .. "|r")
             frame.BottomText:SetText(table.concat(BottomText, ", "))
             frame.Icon:SetTexture(itemTexture)
@@ -518,8 +488,6 @@ function WhoLootData.HoverFrame(fromFrame, toState)
             fromFrame.ItemText:ClearAllPoints()
             fromFrame.ItemText:SetPoint("TOPLEFT",
                 WGLUtil.LerpFloat(WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameEndLeftPos, progress), WhoLootFrameData.ItemNameTopPos)
-            fromFrame.BottomText:ClearAllPoints()
-            fromFrame.BottomText:SetPoint("TOPLEFT", fromFrame.ItemText, "BOTTOMLEFT", 0, -2)
 
             if progress >= 1 then
                 fromFrame:SetScript("OnUpdate", nil) -- Stop the animation
@@ -547,7 +515,7 @@ function WhoLootData.HoverFrame(fromFrame, toState)
             fromFrame.ItemText:SetPoint("TOPLEFT",
                 WGLUtil.LerpFloat(WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameEndLeftPos, progress), WhoLootFrameData.ItemNameTopPos)
             fromFrame.BottomText:ClearAllPoints()
-            fromFrame.BottomText:SetPoint("TOPLEFT", fromFrame.ItemText, "BOTTOMLEFT", 0, -2)
+            fromFrame.BottomText:SetPoint("TOPLEFT", fromFrame.ItemText, "BOTTOMLEFT", 0, -4)
 
             if progress <= 0 then
                 fromFrame:SetScript("OnUpdate", nil) -- Stop the animation
