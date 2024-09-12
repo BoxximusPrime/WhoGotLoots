@@ -1,7 +1,6 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-
-WhoLootData.Version = "1.0.1"
+WhoLootDataVers = "1.0.3"
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
 
@@ -179,6 +178,9 @@ function AddLootFrame(player, itemLink)
         local itemName, linkedItem, itemQuality, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expansionID, setID, isCraftingReagent = C_Item.GetItemInfo(itemLink)
 
         if itemQuality < 3 then return end
+
+        -- Is it a cosmetic item?
+        if C_Item.IsCosmeticItem(CompareItemID) then return end
     
         -- If itemLink was a number, we need to get the itemLink from the Item object.
         if type(itemLink) == "number" then

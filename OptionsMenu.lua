@@ -218,7 +218,7 @@ scaleSlider.KeyLabel2:SetText("2.0")
 -- Show the version number at the bottom right of the options frame.
 local version = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_VersNum")
 version:SetPoint("BOTTOMRIGHT", -6, 6)
-version:SetText("v" .. WhoLootData.Version)
+version:SetText("v" .. WhoLootDataVers)
 
 
 scaleSlider:SetScript("OnMouseUp", function(self, button)
