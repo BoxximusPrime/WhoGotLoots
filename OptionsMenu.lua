@@ -3,7 +3,7 @@ WhoLootsOptionsEntries = {}
 -- Create the options frame
 WhoLootsOptionsFrame = CreateFrame("Frame", nil, nil, "BackdropTemplate")
 WhoLootsOptionsFrame.name = "WhoLootsOptionsFrame"
-WhoLootsOptionsFrame:SetSize(200, 385)
+WhoLootsOptionsFrame:SetSize(200, 395)
 WhoLootData.OptionsFrame = WhoLootsOptionsFrame
 
 -- Make us a child of MainFrame, so we move with it.
@@ -24,6 +24,7 @@ function WhoLootsOptionsEntries.LoadOptions()
     if WhoGotLootsSavedData.ShowOwnLoot == nil then WhoGotLootsSavedData.ShowOwnLoot = true end
     if WhoGotLootsSavedData.ShowDuringRaid == nil then WhoGotLootsSavedData.ShowDuringRaid = true end
     if WhoGotLootsSavedData.ShowDuringLFR == nil then WhoGotLootsSavedData.ShowDuringLFR = false end
+    if WhoGotLootsSavedData.ShowControlHints == nil then WhoGotLootsSavedData.ShowControlHints = true end
 
     WhoLootsOptionsEntries.AutoClose:SetChecked(WhoGotLootsSavedData.AutoCloseOnEmpty)
     WhoLootsOptionsEntries.LockWindow:SetChecked(WhoGotLootsSavedData.LockWindow)
@@ -33,6 +34,7 @@ function WhoLootsOptionsEntries.LoadOptions()
     WhoLootsOptionsEntries.ScaleSlider:SetValue(WhoGotLootsSavedData.SavedSize)
     WhoLootsOptionsEntries.ShowDuringRaid:SetChecked(WhoGotLootsSavedData.ShowDuringRaid)
     WhoLootsOptionsEntries.ShowDuringLFR:SetChecked(WhoGotLootsSavedData.ShowDuringLFR)
+    WhoLootsOptionsEntries.ControlHints:SetChecked(WhoGotLootsSavedData.ShowControlHints)
 
     -- Set the moveable state of the main frame
     WhoLootData.MainFrame:LockWindow(WhoGotLootsSavedData.LockWindow)
@@ -104,109 +106,132 @@ local title = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_Tit
 title:SetPoint("TOPLEFT", 16, -16)
 title:SetText("Options")
 
+-- Create the scroll frame
+local scrollFrame = CreateFrame("ScrollFrame", "ScrollFrame", WhoLootsOptionsFrame, "UIPanelScrollFrameTemplate")
+scrollFrame:SetPoint("TOPLEFT", 10, -50)
+scrollFrame:SetPoint("BOTTOMRIGHT", -30, 10)
+
+-- Create the content frame
+local contentFrame = CreateFrame("Frame", "ContentFrame", scrollFrame)
+
+-- Set the scroll child
+scrollFrame:SetScrollChild(contentFrame)
+
 -- Chekcbox: Auto Close Window
-local autoClose = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
+local autoClose = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(autoClose, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.AutoCloseOnEmpty = tick; end)
 autoClose:SetText("Auto Close")
-autoClose:SetParent(WhoLootsOptionsFrame)
-autoClose:SetPoint("TOPLEFT", title, "BOTTOMLEFT", -2, -16)
+autoClose:SetParent(contentFrame)
+autoClose:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 0, 0)
 WhoLootsOptionsEntries.AutoClose = autoClose
 -- Option text
-local autoClose_Desc = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+local autoClose_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
 autoClose_Desc:SetPoint("TOPLEFT", autoClose, "BOTTOMLEFT", 15, -8)
 autoClose_Desc:SetText("Closes the header frame when empty.")
-autoClose_Desc:SetParent(WhoLootsOptionsFrame)
+autoClose_Desc:SetParent(contentFrame)
 
 
 -- Checkbox: Lock Window
-local lockWindow = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
+local lockWindow = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(lockWindow, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.LockWindow = tick; WhoLootData.MainFrame:LockWindow(tick); end)
 lockWindow.Label:SetText("Lock Window")
 lockWindow:SetPoint("TOPLEFT", autoClose_Desc, "BOTTOMLEFT", -15, -16)
-lockWindow:SetParent(WhoLootsOptionsFrame)
+lockWindow:SetParent(contentFrame)
 WhoLootsOptionsEntries.LockWindow = lockWindow
 -- Option text
-local lockWindow_Desc = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+local lockWindow_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
 lockWindow_Desc:SetPoint("TOPLEFT", lockWindow, "BOTTOMLEFT", 15, -8)
 lockWindow_Desc:SetText("Locks the window in place.")
-lockWindow_Desc:SetParent(WhoLootsOptionsFrame)
+lockWindow_Desc:SetParent(contentFrame)
 
 -- Checkbox: Show Own Loot
-local ShowOwnLoot = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
+local ShowOwnLoot = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(ShowOwnLoot, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowOwnLoot = tick; end)
 ShowOwnLoot.Label:SetText("Show Own Loot")
 ShowOwnLoot:SetPoint("TOPLEFT", lockWindow_Desc, "BOTTOMLEFT", -15, -16)
-ShowOwnLoot:SetParent(WhoLootsOptionsFrame)
+ShowOwnLoot:SetParent(contentFrame)
 WhoLootsOptionsEntries.ShowOwnLoot = ShowOwnLoot
 -- Option text
-local showOwnLoot_Desc = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+local showOwnLoot_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
 showOwnLoot_Desc:SetPoint("TOPLEFT", ShowOwnLoot, "BOTTOMLEFT", 15, -8)
 showOwnLoot_Desc:SetText("Show your own loot in the window.")
-showOwnLoot_Desc:SetParent(WhoLootsOptionsFrame)
+showOwnLoot_Desc:SetParent(contentFrame)
 
 
 -- Checkbox: Hide Unequippable Items
-local HideUnequippable = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
+local HideUnequippable = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(HideUnequippable, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.HideUnequippable = tick; end)
 HideUnequippable.Label:SetText("Hide Unequippable")
 HideUnequippable:SetPoint("TOPLEFT", showOwnLoot_Desc, "BOTTOMLEFT", -15, -16)
-HideUnequippable:SetParent(WhoLootsOptionsFrame)
+HideUnequippable:SetParent(contentFrame)
 WhoLootsOptionsEntries.HideUnequippable = HideUnequippable
 -- Option text
-local hideUnequippable_Desc = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+local hideUnequippable_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
 hideUnequippable_Desc:SetPoint("TOPLEFT", HideUnequippable, "BOTTOMLEFT", 15, -8)
 hideUnequippable_Desc:SetText("Hides items that cannot be equipped.")
-hideUnequippable_Desc:SetParent(WhoLootsOptionsFrame)
+hideUnequippable_Desc:SetParent(contentFrame)
 
 -- Checkbox: Show During Raid
-local ShowDuringRaid = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
+local ShowDuringRaid = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(ShowDuringRaid, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowDuringRaid = tick; end)
 ShowDuringRaid.Label:SetText("Show During Raid")
 ShowDuringRaid:SetPoint("TOPLEFT", hideUnequippable_Desc, "BOTTOMLEFT", -15, -16)
-ShowDuringRaid:SetParent(WhoLootsOptionsFrame)
+ShowDuringRaid:SetParent(contentFrame)
 WhoLootsOptionsEntries.ShowDuringRaid = ShowDuringRaid
 -- Option text
-local showDuringRaid_Desc = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+local showDuringRaid_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
 showDuringRaid_Desc:SetPoint("TOPLEFT", ShowDuringRaid, "BOTTOMLEFT", 15, -8)
 showDuringRaid_Desc:SetText("Show loot while in a raid.")
 
 -- CheckBox: Also show for LFR
-local ShowDuringLFR = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
+local ShowDuringLFR = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(ShowDuringLFR, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowDuringLFR = tick; end)
 ShowDuringLFR.Label:SetText("Show During LFR")
 ShowDuringLFR:SetPoint("TOPLEFT", showDuringRaid_Desc, "BOTTOMLEFT", 0, -10)
-ShowDuringLFR:SetParent(WhoLootsOptionsFrame)
+ShowDuringLFR:SetParent(contentFrame)
 WhoLootsOptionsEntries.ShowDuringLFR = ShowDuringLFR
 -- Option text
-local showDuringLFR_Desc = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+local showDuringLFR_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
 showDuringLFR_Desc:SetPoint("TOPLEFT", ShowDuringLFR, "BOTTOMLEFT", 15, -8)
 showDuringLFR_Desc:SetText("Show loot while in LFR.")
 
 
 -- Sound Toggle
-local SoundToggle = CreateFrame("Button", nil, WhoLootsOptionsFrame, "WGLCheckBoxTemplate")
+local SoundToggle = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(SoundToggle, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.SoundEnabled = tick; end)
 SoundToggle.Label:SetText("Enable Sound")
-SoundToggle:SetPoint("TOPLEFT", showDuringLFR_Desc, "BOTTOMLEFT", -30, -16)
-SoundToggle:SetParent(WhoLootsOptionsFrame)
+SoundToggle:SetPoint("TOPLEFT", showDuringLFR_Desc, "BOTTOMLEFT", -15, -16)
+SoundToggle:SetParent(contentFrame)
 WhoLootsOptionsEntries.SoundToggle = SoundToggle
-
 -- Option text
-local soundToggle_Desc = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+local soundToggle_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
 soundToggle_Desc:SetPoint("TOPLEFT", SoundToggle, "BOTTOMLEFT", 15, -8)
 soundToggle_Desc:SetText("Enable the looting sound effect.")
-soundToggle_Desc:SetParent(WhoLootsOptionsFrame)
+soundToggle_Desc:SetParent(contentFrame)
+
+-- Show control hints
+local controlHints = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
+WGLUIBuilder.AddOnClick(controlHints, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowControlHints = tick; end)
+controlHints.Label:SetText("Show Control Hints")
+controlHints:SetPoint("TOPLEFT", soundToggle_Desc, "BOTTOMLEFT", -30, -16)
+controlHints:SetParent(contentFrame)
+WhoLootsOptionsEntries.ControlHints = controlHints
+-- Option text
+local controlHints_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+controlHints_Desc:SetPoint("TOPLEFT", controlHints, "BOTTOMLEFT", 15, -8)
+controlHints_Desc:SetText("Show control hints in the window.")
+controlHints_Desc:SetParent(contentFrame)
 
 
 -- Scale Slider Title
-local scaleSlider_Desc = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_Checkbox")
-scaleSlider_Desc:SetPoint("TOPLEFT", soundToggle_Desc, "BOTTOMLEFT", -10, -20)
+local scaleSlider_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_Checkbox")
+scaleSlider_Desc:SetPoint("TOPLEFT", controlHints_Desc, "BOTTOMLEFT", -10, -20)
 scaleSlider_Desc:SetText("Adjust the scale of the window.")
-scaleSlider_Desc:SetParent(WhoLootsOptionsFrame)
+scaleSlider_Desc:SetParent(contentFrame)
 
 -- Scale Slider
-local scaleSlider = CreateFrame("Slider", nil, WhoLootsOptionsFrame, "WGLSlider")
-scaleSlider:SetWidth(WhoLootsOptionsFrame:GetWidth() - 32)
+local scaleSlider = CreateFrame("Slider", nil, contentFrame, "WGLSlider")
+scaleSlider:SetWidth(150)
 scaleSlider:SetHeight(5)
 scaleSlider:SetPoint("TOPLEFT", scaleSlider_Desc, "BOTTOMLEFT", 0, -12)
 scaleSlider:SetMinMaxValues(0.5, 2)
@@ -215,9 +240,14 @@ scaleSlider:SetObeyStepOnDrag(true)
 scaleSlider.KeyLabel:SetText("0.5")
 scaleSlider.KeyLabel2:SetText("2.0")
 
+
+
+-- Now, set the content frame size
+contentFrame:SetSize(260, 430)
+
 -- Show the version number at the bottom right of the options frame.
 local version = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_VersNum")
-version:SetPoint("BOTTOMRIGHT", -6, 6)
+version:SetPoint("BOTTOMLEFT", 6, 6)
 version:SetText("v" .. WhoLootDataVers)
 
 

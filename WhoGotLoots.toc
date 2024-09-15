@@ -8,6 +8,7 @@
 Art\Fonts.xml
 Art\UIElements.xml
 
+ItemsDB.lua
 util.lua
 UIBuilder.lua
 ItemBox.lua

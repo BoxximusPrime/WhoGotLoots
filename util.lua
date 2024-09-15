@@ -1,29 +1,5 @@
 WGLUtil = {}
 
--- List of inventory slot IDs for armor pieces only --
-WGLUtil.ArmorPieces = {
-  "INVTYPE_HEAD",
-  "INVTYPE_SHOULDER",
-  "INVTYPE_CHEST",
-  "INVTYPE_HAND",
-  "INVTYPE_WRIST",
-  "INVTYPE_LEGS",
-  "INVTYPE_FEET",
-  "INVTYPE_WAIST"
-}
-
-WGLUtil.WeaponSlots = {
-  "INVTYPE_WEAPON",
-  "INVTYPE_2HWEAPON",
-  "INVTYPE_WEAPONMAINHAND",
-  "INVTYPE_WEAPONOFFHAND",
-  "INVTYPE_SHIELD",
-  "INVTYPE_RANGED",
-  "INVTYPE_RANGEDRIGHT",
-  "INVTYPE_THROWN",
-  "INVTYPE_RANGED2"
-}
-
 function WGLUtil.IsArmorPiece(slotID)
   for _, armorSlotID in ipairs(WGLUtil.ArmorPieces) do
     if slotID == armorSlotID then
@@ -130,4 +106,33 @@ function WGLUtil.CheckIfItemIsShown(itemLink, player)
     end
   end
   return false
+end
+
+-- Determine if an item has the specified mainstat
+-- mainstat is a string, either "agility", "strength", or "intellect"
+function WGLUtil.ItemHasMainStat(itemLink, mainStat)
+  local stats = C_Item.GetItemStats(itemLink)
+
+  local containsMainStat = false
+  for stat, value in pairs(stats) do
+    if mainStat == "Agility" and stat == "ITEM_MOD_AGILITY_SHORT" then
+      containsMainStat = true
+    elseif mainStat == "Strength" and stat == "ITEM_MOD_STRENGTH_SHORT" then
+      containsMainStat = true
+    elseif mainStat == "Intellect" and stat == "ITEM_MOD_INTELLECT_SHORT" then
+      containsMainStat = true
+    end
+  end
+
+  return containsMainStat
+end
+
+function WGLUtil.GetPlayerSpec()
+  local specID = GetSpecializationInfo(GetSpecialization())
+  for class, id in pairs(SPECS) do
+    if id == specID then
+      return class
+    end
+  end
+  return nil
 end

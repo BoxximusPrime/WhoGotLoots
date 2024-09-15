@@ -91,19 +91,48 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.BottomText:SetText("Bottom Text")
 
     -- Create a close button to remove the frame.
-    local close = CreateFrame("Button", nil, ItemFrame, "WGLCloseBtn")
-    close:SetSize(12, 12)
-    close:SetPoint("TOPRIGHT", -6, -6)
-    close.ParentFrame = ItemFrame
+    ItemFrame.Close = CreateFrame("Button", nil, ItemFrame, "WGLCloseBtn")
+    ItemFrame.Close:SetSize(12, 12)
+    ItemFrame.Close:SetPoint("TOPRIGHT", -6, -6)
+    ItemFrame.Close.ParentFrame = ItemFrame
+
+    ItemFrame.HintContainer = CreateFrame("Frame", nil, ItemFrame)
+    ItemFrame.HintContainer:SetSize(100, 12)
+    ItemFrame.HintContainer:SetPoint("TOPRIGHT", ItemFrame.Close, "LEFT", -4, 0)
+    ItemFrame.HintContainer:SetFrameLevel(ItemFrame:GetFrameLevel() + 1)
+    ItemFrame.HintContainer:SetAlpha(0)
+
+    -- Show the left and right click icons to the left of the close button
+    ItemFrame.RightClickIcon = ItemFrame:CreateTexture(nil, "OVERLAY")
+    ItemFrame.RightClickIcon:SetSize(8, 8)
+    ItemFrame.RightClickIcon:SetPoint("RIGHT", ItemFrame.Close, "LEFT", -4, 0)
+    ItemFrame.RightClickIcon:SetTexture("Interface\\Addons\\WhoGotLoots\\Art\\RightClick")
+    ItemFrame.RightClickIcon:SetVertexColor(1, 1, 1, 1)
+    ItemFrame.RightClickIcon:SetParent(ItemFrame.HintContainer)
+
+    -- Show "shift" text and left click icon to the left of the right click icon
+    ItemFrame.LeftClickIcon = ItemFrame:CreateTexture(nil, "OVERLAY")
+    ItemFrame.LeftClickIcon:SetSize(8, 8)
+    ItemFrame.LeftClickIcon:SetPoint("RIGHT", ItemFrame.RightClickIcon, "LEFT", -4, 0)
+    ItemFrame.LeftClickIcon:SetTexture("Interface\\Addons\\WhoGotLoots\\Art\\LeftClick")
+    -- ItemFrame.LeftClickIcon:SetVertexColor(0.2, 0.1, 0.8, 1)
+    ItemFrame.LeftClickIcon:SetParent(ItemFrame.HintContainer)
+
+    ItemFrame.ShiftText = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_VersNum")
+    ItemFrame.ShiftText:SetPoint("RIGHT", ItemFrame.LeftClickIcon, "LEFT", 0, 0)
+    ItemFrame.ShiftText:SetText("Shift + ")
+    ItemFrame.ShiftText:SetParent(ItemFrame.HintContainer)
+    ItemFrame.ShiftText:SetTextColor(0.8, 0.8, 0.8, 1)
+
 
     -- Add the frame to the list of frames.
     WhoGotLootsFrames[#WhoGotLootsFrames + 1] = ItemFrame
 
     -- Register user interaction.
-    ItemFrame:SetScript("OnEnter", function(self) WhoLootData.HoverFrame(self, true) end)
-    ItemFrame:SetScript("OnLeave", function(self) WhoLootData.HoverFrame(self, false) end)
+    ItemFrame:SetScript("OnEnter", function(self) WhoLootData.HoverFrame(self, true); self:HoverOver(); end)
+    ItemFrame:SetScript("OnLeave", function(self) WhoLootData.HoverFrame(self, false); self:HoverOut(); end)
 
-    close:SetScript("OnClick", function(self)
+    function  ItemFrame.Close:CloseFrame()
         PlaySound(856)
         self.ParentFrame:Hide()
         self.ParentFrame.InUse = false
@@ -117,9 +146,36 @@ function WGL_FrameManager:CreateFrame()
         end
 
         WhoLootData.ResortFrames()
-    end)
-    close:SetScript("OnEnter", function(self) self.Btn:SetVertexColor(1, 1, 1, 1); WhoLootData.HoverFrame(ItemFrame, true) end)
-    close:SetScript("OnLeave", function(self) self.Btn:SetVertexColor(0.7, 0.7, 0.7, 1); WhoLootData.HoverFrame(ItemFrame, false) end)
+    end
+
+    ItemFrame.Close:SetScript("OnClick", function(self) self:CloseFrame() end)
+    ItemFrame.Close:SetScript("OnEnter", function(self) self.Btn:SetVertexColor(1, 1, 1, 1); WhoLootData.HoverFrame(ItemFrame, true); end)
+    ItemFrame.Close:SetScript("OnLeave", function(self) self.Btn:SetVertexColor(0.7, 0.7, 0.7, 1); WhoLootData.HoverFrame(ItemFrame, false); end)
+
+    function ItemFrame:HoverOver()
+        if WhoGotLootsSavedData.ShowControlHints then
+            -- Fade the ItemFrame.HintContainer in over 0.2 seconds
+            self.HintContainer:SetAlpha(0)
+            self.HintContainer:Show()
+            self.HintContainer:SetScript("OnUpdate", function(self, elapsed)
+                self:SetAlpha(WGLUtil.Clamp(self:GetAlpha() + elapsed * 5, 0, 1))
+                if self:GetAlpha() >= 1 then
+                    self:SetScript("OnUpdate", nil)
+                end
+            end)
+        end
+    end
+
+    function ItemFrame:HoverOut()
+        -- Fade the ItemFrame.HintContainer out over 0.2 seconds
+        self.HintContainer:SetScript("OnUpdate", function(self, elapsed)
+            self:SetAlpha(WGLUtil.Clamp(self:GetAlpha() - elapsed * 5, 0, 1))
+            if self:GetAlpha() <= 0 then
+                self:Hide()
+                self:SetScript("OnUpdate", nil)
+            end
+        end)
+    end
 
     -- Animation/visual controls
     function ItemFrame:Reset()

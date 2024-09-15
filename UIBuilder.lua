@@ -31,10 +31,58 @@ function WGLUIBuilder.CreateMainFrame()
     end)
     closeBtn:SetFrameLevel(3)
 
+    -- Create the info button. Align it to the left of the main frame.
+    mainFrame.infoBtn = CreateFrame("Button", nil, mainFrame, "WGLInfoBtn")
+    mainFrame.infoBtn:SetPoint("TOPRIGHT", mainFrame, "TOPLEFT", -9, -27)
+    mainFrame.infoBtn:SetSize(12, 12)
+    mainFrame.infoBtn:SetFrameLevel(3)
+    mainFrame.infoBtn:SetScript("OnEnter", function()
+        mainFrame.infoBtn.Btn:SetVertexColor(1, 1, 1, 1);
+        -- Fade the tooltip in over 0.2 seconds.
+        mainFrame.infoTooltip:Show()
+        mainFrame.infoTooltip:SetAlpha(0)
+        mainFrame.infoTooltip:SetScript("OnUpdate", function(self, elapsed)
+            self:SetAlpha(WGLUtil.Clamp(self:GetAlpha() + elapsed * 5, 0, 1))
+        end)
+    end)
+    mainFrame.infoBtn:SetScript("OnLeave", function()
+        mainFrame.infoBtn.Btn:SetVertexColor(0.7, 0.7, 0.7, 1);
+        -- Fade the tooltip out over 1 seconds.
+        mainFrame.infoTooltip:SetScript("OnUpdate", function(self, elapsed)
+            self:SetAlpha(WGLUtil.Clamp(self:GetAlpha() - elapsed * 2, 0, 1))
+            if self:GetAlpha() == 0 then
+                self:Hide()
+                self:SetScript("OnUpdate", nil)
+            end
+        end)
+    end)
+
+    -- Create an information tooltip to show when the info button is hovered.
+    mainFrame.infoTooltip = CreateFrame("Frame", nil, UIParent)
+    mainFrame.infoTooltip:SetSize(270, 75)
+    mainFrame.infoTooltip:SetPoint("BOTTOMLEFT", mainFrame.infoBtn, "TOPLEFT", -15, 0)
+    mainFrame.infoTooltip:SetFrameLevel(4)
+    mainFrame.infoTooltip.Text = mainFrame.infoTooltip:CreateFontString(nil, "OVERLAY", "WGLFont_Tooltip")
+    mainFrame.infoTooltip.Text:SetAllPoints(true)
+    mainFrame.infoTooltip.Text:SetPoint("TOPLEFT", mainFrame.infoTooltip, "TOPLEFT", 15, -0)
+    mainFrame.infoTooltip.Text:SetText("- Double left click to equip the item (if it's your loot).\n- Shift + left click to link the item in chat.\n- Right click to dismiss the item.")
+    mainFrame.infoTooltip.Text:SetJustifyH("LEFT")
+    mainFrame.infoTooltip.Text:SetSpacing(4)
+    mainFrame.infoTooltip:SetScale(1.4)
+    mainFrame.infoTooltip:Hide()
+
+    -- Draw background and border
+    WGLUIBuilder.DrawSlicedBG(mainFrame.infoTooltip, "OptionsWindowBG", "backdrop", 6)
+    WGLUIBuilder.ColorBGSlicedFrame(mainFrame.infoTooltip, "backdrop", 1, 1, 1, 0.95)
+    mainFrame.infoTooltip.Border = CreateFrame("Frame", nil, mainFrame.infoTooltip)
+    mainFrame.infoTooltip.Border:SetAllPoints(true)
+    WGLUIBuilder.DrawSlicedBG(mainFrame.infoTooltip.Border, "EdgedBorder", "border", 6)
+    WGLUIBuilder.ColorBGSlicedFrame(mainFrame.infoTooltip.Border, "border", 0.5, 0.5, 0.5, 1)
+
     -- Create a frame that captures the cursor's onEnter and onLeave events.
     -- This'll be useed to show the options and close buttons.
     mainFrame.cursorFrame = CreateFrame("Frame", nil, UIParent)
-    mainFrame.cursorFrame:SetSize(180, 40)
+    mainFrame.cursorFrame:SetSize(200, 40)
     mainFrame.cursorFrame:SetPoint("CENTER", 0, 0)
 
     -- Extend the frame to the edges of the screen.
@@ -96,10 +144,14 @@ function WGLUIBuilder.CreateMainFrame()
         moveAmount = math.sin(self.HoverAnimDelta * (math.pi * 0.5)) * moveAmount
         optionsBtn:SetPoint("TOPLEFT", mainFrame, "TOPRIGHT", moveAmount + (self.MoveAmount * -1), -27)
         closeBtn:SetPoint("TOP", optionsBtn, "BOTTOM", 0, 30)
-
-        -- Also make them fade in/out.
         optionsBtn:SetAlpha(self.HoverAnimDelta)
         closeBtn:SetAlpha(self.HoverAnimDelta)
+
+        -- Also move the info button to swoop in from the left.
+        moveAmount = mainFrame.cursorFrame.MoveAmount * self.HoverAnimDelta
+        moveAmount = math.sin(self.HoverAnimDelta * (math.pi * 0.5)) * -moveAmount
+        mainFrame.infoBtn:SetPoint("TOPRIGHT", mainFrame, "TOPLEFT", moveAmount - (self.MoveAmount * -1), -20)
+        mainFrame.infoBtn:SetAlpha(self.HoverAnimDelta)
     end)
 
     function mainFrame:Move(point)
@@ -150,13 +202,13 @@ FrameTextures =
 
     ItemEntryBG = {
         file = "ItemBG",
-        cornerSize = 12,
+        cornerSize = 8,
         cornerCoord = 0.25,
     },
 
     ItemEntryBorder = {
         file = "EdgedBorder",
-        cornerSize = 12,
+        cornerSize = 8,
         cornerCoord = 0.25,
     },
 

@@ -1,6 +1,7 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-WhoLootDataVers = "1.0.3"
+WhoLootDataVers = "1.1.0"
+WGLDEBUG = false
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
 
@@ -11,6 +12,10 @@ WhoLootData.MainFrame:SetDontSavePosition(true)
 -- Create a frame that acts as a timer, which iterates through all active frames and hides them when their time is up.
 local TimerFrame = CreateFrame("Frame")
 TimerFrame:SetScript("OnUpdate", function(self, elapsed)
+
+    -- If the options window is open, don't hide the frames.
+    if WhoLootsOptionsFrame:IsVisible() then return end
+
     for i, frame in ipairs(WhoLootData.ActiveFrames) do
         if frame.HoverAnimDelta == nil then
             frame.Lifetime = frame.Lifetime - elapsed
@@ -173,47 +178,66 @@ function AddLootFrame(player, itemLink)
     end
 
     CompareItem:ContinueOnItemLoad(function()
+
         local CompareItemID = C_Item.GetItemIDForItemInfo(itemLink)
         local CompareItemIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemLink)
         local itemName, linkedItem, itemQuality, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expansionID, setID, isCraftingReagent = C_Item.GetItemInfo(itemLink)
 
         if itemQuality < 3 then return end
 
+        if C_Item.IsItemBindToAccountUntilEquip(itemLink) and GetUnitName("player") ~= GetUnitName(player) then
+            if WGLDEBUG then print("bind on account detected") end
+            return
+        end
+
         -- Is it a cosmetic item?
         if C_Item.IsCosmeticItem(CompareItemID) then return end
     
         -- If itemLink was a number, we need to get the itemLink from the Item object.
-        if type(itemLink) == "number" then
-            itemLink = linkedItem
-        end
+        if type(itemLink) == "number" then itemLink = linkedItem end
 
-        local CanEquip = C_Item.DoesItemContainSpec(CompareItemID, select(3, UnitClass("player")))
-        if not CanEquip and WhoGotLootsSavedData.HideUnequippable then
-            -- if there's no active frames, hide the main window.
-            if #WhoLootData.ActiveFrames == 0 then
-                WhoLootData.MainFrame:Close()
-            end
-            return
-        end
-
-        if itemType ~= "Armor" and itemType ~= "Weapon" then return end
-
+        -- Grab the player's main stat.
+        local PlayerTopStat = WGLUtil.GetPlayerMainStat()
         local BottomText = {}
 
+        -- Check if the item is appropriate for the player's class.
+        local CanEquip = WGLItemsDB.CanEquip(CompareItemID, select(2, UnitClass("player")))
+        local IsAppropriate = WGLItemsDB.IsAppropriate(CompareItemID, select(2, UnitClass("player")))
+        local ItemHasMainStat = WGLUtil.ItemHasMainStat(itemLink, PlayerTopStat)
+
+        -- If this is a ring, or neck we dont need to worry about the main stat.
+        if itemEquipLoc == "INVTYPE_FINGER" or itemEquipLoc == "INVTYPE_NECK" or itemEquipLoc == "INVTYPE_TRINKET" then
+            ItemHasMainStat = true
+        end
+
+        -- If we don't want to show unequippable items, and this item is not equippable, return.
+        if WhoGotLootsSavedData.HideUnequippable == true and (CanEquip == false or IsAppropriate == false or ItemHasMainStat == false) then return end
+
+        -- We only worry about armor and weapons.
+        if itemType ~= "Armor" and itemType ~= "Weapon" then return end
+
         -- If we can equip this item, check if it's an upgrade.
-        if CanEquip then
+        if CanEquip == true and IsAppropriate == true and ItemHasMainStat then
 
             -- First, check if we're at the minimum character level.
             if UnitLevel("player") < itemMinLevel then
                 table.insert(BottomText, "|cFFFF0000Level " .. itemMinLevel .. "|r")
             end
 
+            if WGLDEBUG then print("Item Loc: " .. itemEquipLoc) end
+
             local slotName = GetItemSlotName(itemLink)
             local slotID, _ = GetInventorySlotInfo(slotName)
             local ItemLoc = ItemLocation:CreateFromEquipmentSlot(slotID)
             local CurrentItemIlvl = ItemLoc and ItemLoc:IsValid() and C_Item.GetCurrentItemLevel(ItemLoc) or 0
             local CurrentItemLink = GetInventoryItemLink("player", slotID)
-            local Skip = false
+            local IsUnique = false
+            local IsDiffItemType = false
+
+            -- If we have something in the same slot (like off-hand) but it's not the same item type.
+            if CurrentItemLink and itemEquipLoc ~= select(9, GetItemInfo(CurrentItemLink)) then
+                IsDiffItemType = true
+            end
 
             -- If this is a trinket, find the lowest ilvl trinket we have.
             if itemEquipLoc == "INVTYPE_TRINKET" then
@@ -231,9 +255,9 @@ function AddLootFrame(player, itemLink)
                     -- If we have the same trinket, but it's at a lower ilvl, we want to show it.
                     local trinketSlot = (trinket1id == CompareItemID) and 13 or 14
                     if C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(trinketSlot)) < CompareItemIlvl then
-                        Skip = false
+                        IsUnique = false
                     else
-                        Skip = true
+                        IsUnique = true
                     end
                 end
 
@@ -257,9 +281,9 @@ function AddLootFrame(player, itemLink)
                     -- If we have the same ring, but it's at a lower ilvl, we want to show it.
                     ringSlot = (ring1id == CompareItemID) and 11 or 12
                     if C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(ringSlot)) < CompareItemIlvl then
-                        Skip = false
+                        IsUnique = false
                     else
-                        Skip = true
+                        IsUnique = true
                     end
                 end
 
@@ -274,8 +298,12 @@ function AddLootFrame(player, itemLink)
                 table.insert(BottomText, "Mainhand:")
             end
 
+            -- If we have a unique equipped, then we don't want to show it.
+            if IsUnique then 
+                table.insert(BottomText, "|cFFFF0000Unique Equipped|r")
+            end
 
-            if not Skip then
+            if not IsUnique then
 
                 -- Show the ilvl diff if any
                 local ilvlDiff = CompareItemIlvl - CurrentItemIlvl
@@ -287,15 +315,12 @@ function AddLootFrame(player, itemLink)
                     table.insert(BottomText, "Same Ilvl")
                 end
 
-                -- Next, figure out which stat is relevant to us. Get the player's main stats, and find the highest one.
-                local PlayerTopStat = WGLUtil.GetPlayerMainStat()
-
                 -- Get the compare item's stats.
                 local CompareItemStats = C_Item.GetItemStats(itemLink)
                 
                 -- Now, get the main stat of our currently equipped item (if we have one)
                 local diffStat = 0
-                if itemEquipLoc ~= "INVTYPE_HOLDABLE" and itemEquipLoc ~= "INVTYPE_WEAPONOFFHAND" then
+                if not IsDiffItemType and itemEquipLoc ~= "INVTYPE_HOLDABLE" and itemEquipLoc ~= "INVTYPE_WEAPONOFFHAND" then
 
                     local CompareItemMainStat = nil
                     if CompareItemStats then
@@ -303,7 +328,7 @@ function AddLootFrame(player, itemLink)
                     end
 
                     -- If we have an item equipped in the same slot, compare the main stats.
-                    if CurrentItemLink then
+                    if CurrentItemLink and ourItemMainStat then
 
                         ourItemMainStat = WGLUtil.GetItemMainStat(C_Item.GetItemStats(CurrentItemLink), PlayerTopStat)
 
@@ -329,7 +354,7 @@ function AddLootFrame(player, itemLink)
                 end
 
                 -- If the item level is the same as what we have now, give a quick stat change breakdown.
-                if itemEquipLoc ~= "INVTYPE_HOLDABLE" and itemEquipLoc ~= "INVTYPE_WEAPONOFFHAND" then
+                --if itemEquipLoc ~= "INVTYPE_HOLDABLE" and itemEquipLoc ~= "INVTYPE_WEAPONOFFHAND" then
                     local stats = {
                         Haste = { ours = 0, theirs = 0 },
                         Mastery = { ours = 0, theirs = 0 },
@@ -400,18 +425,20 @@ function AddLootFrame(player, itemLink)
                             end
                         end
                     end
-                end
-            else
-                table.insert(BottomText, "|cFFFF0000Unique Equipped|r")
             end
         end
 
-        if not CanEquip then
-            if WGLUtil.IsArmorPiece(itemEquipLoc) then
-                table.insert(BottomText, "|cffff0000" .. itemSubType .. "|r")
-            else
-                table.insert(BottomText, "|cffff0000" .. _G[itemEquipLoc] .. "|r")
-            end
+        if WGLDEBUG then
+            print("CanEquip: " .. tostring(CanEquip) .. ", IsAppropriate: " .. tostring(IsAppropriate) .. ", ItemHasMainStat: " .. tostring(ItemHasMainStat))
+        end
+
+        -- Display why we can't equip the item.
+        if CanEquip == false then
+            table.insert(BottomText, "|cFFFF0000Can't equip " .. GetItemSubClassInfo(classID, subclassID) .. "|r")
+        elseif IsAppropriate == false then
+            table.insert(BottomText, "|cFFFF0000You don't wear " .. string.lower(GetItemSubClassInfo(classID, subclassID)) .. "|r")
+        elseif ItemHasMainStat == false then
+            table.insert(BottomText, "|cFFFF0000No " .. PlayerTopStat .. "|r")
         end
 
         -- Look into the Frame Manager and find an available frame.
@@ -437,15 +464,33 @@ function AddLootFrame(player, itemLink)
             frame.Icon:SetTexture(itemTexture)
             frame.Item = itemLink
             frame:DropIn(1.0, 0.2)
+            frame.lastClickTime = 0
 
             -- Store the frame in the ChildFrames table.
             WhoLootData.ActiveFrames[#WhoLootData.ActiveFrames + 1] = frame
             WhoLootData.ResortFrames()
 
-            -- Set a shift + click function to add the item link to the chat box.
+            -- Set left clicking functions to add the item link to the chat box, and to equip item.
             frame:SetScript("OnMouseDown", function(self, button)
                 if IsShiftKeyDown() then
                     ChatEdit_InsertLink(itemLink)
+                else
+                    if player == GetUnitName("player") then
+                        local currentTime = GetTime()
+                        if currentTime - self.lastClickTime < 0.4 then
+                            if WGLDEebug then print("Equipping " .. itemLink) end
+                            EquipItemByName(itemLink)
+                            self.Close:CloseFrame()
+                        end
+                        self.lastClickTime = currentTime
+                    end
+                end
+            end)
+
+            -- Right click to close it.
+            frame:SetScript("OnMouseUp", function(self, button)
+                if button == "RightButton" then
+                    self.Close:CloseFrame()
                 end
             end)
 
@@ -560,6 +605,9 @@ SlashCmdList["WHOLOOT"] = function(msg, editbox)
             local itemLink = msg:sub(5)
             AddLootFrame(GetUnitName("player"), itemLink)
         end
+    elseif msg:sub(1, 5) == "debug" then
+        WGLDEBUG = not WGLDEBUG
+        print("Debug mode is now " .. (WGLDEBUG and "enabled" or "disabled"))
     else
         if WhoLootData.MainFrame:IsVisible() then
             WhoLootData.MainFrame:Close()
