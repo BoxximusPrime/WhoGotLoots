@@ -124,6 +124,41 @@
         </Scripts>
     </Button>
 
+    <Frame name="LoadingIcon" virtual="true">
+        <Size x="32" y="32"/>
+        <Anchors>
+            <Anchor point="CENTER" relativePoint="CENTER" y="0"/>
+        </Anchors>
+        <Layers>
+            <Layer level="BACKGROUND" textureSubLevel="4">
+				<Texture file="Interface\AddOns\WhoGotLoots\Art\LoadingIcon" parentKey="Icon" hidden="false">
+                    <Color r="1" g="1" b="1" a="0.8"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="0" y="0"/>
+						<Anchor point="BOTTOMRIGHT" x="0" y="0"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+        </Layers>
+        <Color r="1" g="1" b="1" a="0.7"/>
+        <Scripts>
+            <OnLoad>
+                self.rotationAngle = 0
+            </OnLoad>
+            <OnShow>
+                if not self:GetScript("OnUpdate") then
+                    self:SetScript("OnUpdate", function(self, elapsed)
+                        self.rotationAngle = self.rotationAngle + elapsed * 3 * -math.pi
+                        self.Icon:SetRotation(self.rotationAngle)
+                    end)
+                end
+            </OnShow>
+            <OnHide>
+                self:SetScript("OnUpdate", nil)
+            </OnHide>
+        </Scripts>
+    </Frame>
+
     <Button name="WGLOptionsBtn" virtual="true">
         <Size x="24" y="24"/>
         <Anchors>

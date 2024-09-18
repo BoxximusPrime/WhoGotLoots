@@ -43,16 +43,16 @@ function WGL_FrameManager:CreateFrame()
 
     -- Create the background
     ItemFrame.background = CreateFrame("Frame", nil, ItemFrame);
-    ItemFrame.background:SetAllPoints(true);
+    ItemFrame.background:SetAllPoints();
     ItemFrame.background:SetFrameLevel(ItemFrame:GetFrameLevel());
-    WGLUIBuilder.DrawSlicedBG(ItemFrame.background, "ItemEntryBG", "backdrop", 0, nil)
+    WGLUIBuilder.DrawSlicedBG(ItemFrame.background, "ItemEntryBG", "backdrop", 0)
     WGLUIBuilder.ColorBGSlicedFrame(ItemFrame.background, "backdrop", 0.12, 0.1, 0.1, 0.85)
 
     -- Create the border
     ItemFrame.border = CreateFrame("Frame", nil, ItemFrame);
-    ItemFrame.border:SetAllPoints(true);
+    ItemFrame.border:SetAllPoints();
     ItemFrame.border:SetFrameLevel(ItemFrame:GetFrameLevel() + 1);
-    WGLUIBuilder.DrawSlicedBG(ItemFrame.border, "ItemEntryBorder", "border", 0, nil)
+    WGLUIBuilder.DrawSlicedBG(ItemFrame.border, "ItemEntryBorder", "border", 0)
     WGLUIBuilder.ColorBGSlicedFrame(ItemFrame.border, "border", 0.4, 0.4, 0.4, 1)
 
     -- Create a text showing which player it was.
@@ -79,6 +79,12 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.Icon:SetParent(ItemFrame)
     ItemFrame.Icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
 
+    -- Create a loading icon over the item icon.
+    ItemFrame.LoadingIcon = CreateFrame("Frame", nil, ItemFrame, "LoadingIcon")
+    ItemFrame.LoadingIcon:SetParent(ItemFrame)
+    ItemFrame.LoadingIcon:SetAllPoints(ItemFrame.Icon, true)
+    ItemFrame.LoadingIcon:Hide()
+
     -- Show the item's name.
     ItemFrame.ItemText = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_ItemName")
     ItemFrame.ItemText:SetPoint("TOPLEFT", 85, -8)
@@ -86,7 +92,7 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.ItemText:SetParent(ItemFrame)
 
     ItemFrame.BottomText = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_Item_StatBottomText")
-    ItemFrame.BottomText:SetPoint("TOPLEFT", itemText, "BOTTOMLEFT", 0, -4)
+    ItemFrame.BottomText:SetPoint("TOPLEFT", nil, "BOTTOMLEFT", 0, -4)
     ItemFrame.BottomText:SetParent(ItemFrame)
     ItemFrame.BottomText:SetText("Bottom Text")
 
@@ -158,7 +164,7 @@ function WGL_FrameManager:CreateFrame()
             self.HintContainer:SetAlpha(0)
             self.HintContainer:Show()
             self.HintContainer:SetScript("OnUpdate", function(self, elapsed)
-                self:SetAlpha(WGLUtil.Clamp(self:GetAlpha() + elapsed * 5, 0, 1))
+                self:SetAlpha(WGLU.Clamp(self:GetAlpha() + elapsed * 5, 0, 1))
                 if self:GetAlpha() >= 1 then
                     self:SetScript("OnUpdate", nil)
                 end
@@ -166,10 +172,23 @@ function WGL_FrameManager:CreateFrame()
         end
     end
 
+    function ItemFrame.LoadingIcon:FadeOut()
+        self:SetScript("OnUpdate", function(self, elapsed)
+            local newAlpha = self:GetAlpha() - elapsed
+            if newAlpha <= 0 then
+                self:SetAlpha(0)
+                self:SetScript("OnUpdate", nil)
+                self:Hide()
+            else
+                self:SetAlpha(newAlpha)
+            end
+        end)
+    end
+
     function ItemFrame:HoverOut()
         -- Fade the ItemFrame.HintContainer out over 0.2 seconds
         self.HintContainer:SetScript("OnUpdate", function(self, elapsed)
-            self:SetAlpha(WGLUtil.Clamp(self:GetAlpha() - elapsed * 5, 0, 1))
+            self:SetAlpha(WGLU.Clamp(self:GetAlpha() - elapsed * 5, 0, 1))
             if self:GetAlpha() <= 0 then
                 self:Hide()
                 self:SetScript("OnUpdate", nil)
@@ -228,7 +247,7 @@ function WGL_FrameManager:CreateFrame()
     function ItemFrame:FadeOut()
         self.Animating = true
         self:SetScript("OnUpdate", function(self, elapsed)
-            self:SetAlpha(WGLUtil.Clamp(self:GetAlpha() - elapsed * 2, 0, 1))
+            self:SetAlpha(WGLU.Clamp(self:GetAlpha() - elapsed * 2, 0, 1))
             if self:GetAlpha() <= 0 then
                 self:Hide()
                 self.InUse = false

@@ -88,15 +88,15 @@ function WhoLootsOptionsEntries.OpenOptions()
 end
 
 -- Create the background
-bg = CreateFrame("Frame", nil, WhoLootsOptionsFrame);
-bg:SetAllPoints(true);
+local bg = CreateFrame("Frame", nil, WhoLootsOptionsFrame);
+bg:SetAllPoints();
 bg:SetFrameLevel(WhoLootsOptionsFrame:GetFrameLevel());
 WGLUIBuilder.DrawSlicedBG(bg, "OptionsWindowBG", "backdrop", 0)
 WGLUIBuilder.ColorBGSlicedFrame(bg, "backdrop", 1, 1, 1, 0.95)
 
 -- Create the border
-border = CreateFrame("Frame", nil, WhoLootsOptionsFrame);
-border:SetAllPoints(true);
+local border = CreateFrame("Frame", nil, WhoLootsOptionsFrame);
+border:SetAllPoints();
 border:SetFrameLevel(WhoLootsOptionsFrame:GetFrameLevel() + 1);
 WGLUIBuilder.DrawSlicedBG(border, "EdgedBorder", "border", 0)
 WGLUIBuilder.ColorBGSlicedFrame(border, "border", 0.4, 0.4, 0.4, 1)

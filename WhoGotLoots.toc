@@ -12,5 +12,6 @@ ItemsDB.lua
 util.lua
 UIBuilder.lua
 ItemBox.lua
+CacheHandler.lua
 WhoGotLoots.lua
 OptionsMenu.lua

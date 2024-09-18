@@ -1,6 +1,6 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-WhoLootDataVers = "1.1.0"
+WhoLootDataVers = "1.2.0"
 WGLDEBUG = false
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
@@ -9,30 +9,17 @@ WhoLootData.MainFrame = WGLUIBuilder.CreateMainFrame()
 WhoLootData.MainFrame:SetParent(UIParent)
 WhoLootData.MainFrame:SetDontSavePosition(true)
 
--- Create a frame that acts as a timer, which iterates through all active frames and hides them when their time is up.
-local TimerFrame = CreateFrame("Frame")
-TimerFrame:SetScript("OnUpdate", function(self, elapsed)
-
-    -- If the options window is open, don't hide the frames.
-    if WhoLootsOptionsFrame:IsVisible() then return end
-
-    for i, frame in ipairs(WhoLootData.ActiveFrames) do
-        if frame.HoverAnimDelta == nil then
-            frame.Lifetime = frame.Lifetime - elapsed
-            frame.ProgressBar:SetValue(frame.Lifetime / WhoLootFrameData.FrameLifetime)
-            if frame.Lifetime <= 0 then
-                frame:FadeOut()
-            end
-        end
-    end
-end)
-
 -- Register Events --
 WhoLootData.MainFrame:RegisterEvent("ADDON_LOADED"); -- Fired when saved variables are loaded
 WhoLootData.MainFrame:RegisterEvent("CHAT_MSG_LOOT")
+WhoLootData.MainFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+WhoLootData.MainFrame:RegisterEvent("UNIT_INVENTORY_CHANGED")
+WhoLootData.MainFrame:RegisterEvent('INSPECT_READY')
+WhoLootData.MainFrame:RegisterEvent('GET_ITEM_INFO_RECEIVED')
+--WhoLootData.MainFrame:RegisterEvent('GROUP_ROSTER_UPDATE')
 
 -- Handle Events --
-function WhoLootData.MainFrame:OnEvent(event, ...)
+function HandleEvents(self, event, ...)
     local args = {...}
     if event == "ADDON_LOADED" and args[1] == "WhoGotLoots" then
         WhoGotLootsSavedData = WhoGotLootsSavedData or {}
@@ -69,24 +56,28 @@ function WhoLootData.MainFrame:OnEvent(event, ...)
         end
     end
 end
-WhoLootData.MainFrame:SetScript("OnEvent", WhoLootData.MainFrame.OnEvent)
+WhoLootData.MainFrame:SetScript("OnEvent", HandleEvents)
 
-local function getGearItemLvl(slotName)
-    local lvl = 0
-    if (slotName ~= nil) then
-        local slotID, texture, checkRelic = GetInventorySlotInfo(slotName)
-        if (slotID ~= nil) then
-            local itemLocation = ItemLocation:CreateFromEquipmentSlot(slotID)
-            if C_Item.DoesItemExist(itemLocation) then
-                lvl = C_Item.GetCurrentItemLevel(itemLocation)
+-- Create a frame that acts as a timer, which iterates through all active frames and hides them when their time is up.
+local TimerFrame = CreateFrame("Frame")
+TimerFrame:SetScript("OnUpdate", function(self, elapsed)
+
+    -- If the options window is open, don't hide the frames.
+    if WhoLootsOptionsFrame:IsVisible() then return end
+
+    for i, frame in ipairs(WhoLootData.ActiveFrames) do
+        if frame.HoverAnimDelta == nil then
+            frame.Lifetime = frame.Lifetime - elapsed
+            frame.ProgressBar:SetValue(frame.Lifetime / WhoLootFrameData.FrameLifetime)
+            if frame.Lifetime <= 0 then
+                frame:FadeOut()
             end
         end
     end
-    return format("%s", lvl)
-end
+end)
 
 local function GetItemSlotName(itemLink)
-    local equipLoc = select(9, GetItemInfo(itemLink))
+    local equipLoc = select(9, C_Item.GetItemInfo(itemLink))
     local equipLocToSlotName = {
         INVTYPE_HEAD = "HeadSlot",
         INVTYPE_NECK = "NeckSlot",
@@ -133,18 +124,11 @@ end
 -- Function to add a loot frame to the main window.
 function AddLootFrame(player, itemLink)
 
-    -- Is the item at least rare qualty?
-    local itemQuality = select(3, GetItemInfo(itemLink))
-
     -- Does the player name have their realm? Check for a -
-    if string.find(player, "-") then
-        player = string.match(player, "(.*)-")
-    end
+    if string.find(player, "-") then player = string.match(player, "(.*)-") end
 
     -- If it was our loot, don't show the frame.
-    if player == UnitName("player") and WhoGotLootsSavedData.ShowOwnLoot ~= true then
-        return
-    end
+    if player == UnitName("player") and WhoGotLootsSavedData.ShowOwnLoot ~= true then return end
 
     -- Are we in a raid, and should we show raid loot?
     local isInRaid = IsPlayerInRaidInstance()
@@ -154,7 +138,7 @@ function AddLootFrame(player, itemLink)
     end
 
     -- If the player is nil, set it to the player.
-    if UnitClass(player) == nil then player = "player" end
+    --if UnitClass(player) == nil then player = "player" end
 
     -- If we've ran out of frames, remove the oldest one.
     if #WhoLootData.ActiveFrames >= WGL_NumPooledFrames then
@@ -186,24 +170,44 @@ function AddLootFrame(player, itemLink)
         if itemQuality < 3 then return end
 
         if C_Item.IsItemBindToAccountUntilEquip(itemLink) and GetUnitName("player") ~= GetUnitName(player) then
-            if WGLDEBUG then print("bind on account detected") end
+            WGLU.DebugPrint("bind on account detected")
             return
         end
 
         -- Is it a cosmetic item?
         if C_Item.IsCosmeticItem(CompareItemID) then return end
+
+        -- We only worry about armor and weapons.
+        if itemType ~= "Armor" and itemType ~= "Weapon" then return end
     
         -- If itemLink was a number, we need to get the itemLink from the Item object.
         if type(itemLink) == "number" then itemLink = linkedItem end
 
         -- Grab the player's main stat.
-        local PlayerTopStat = WGLUtil.GetPlayerMainStat()
+        local PlayerTopStat = WGLU.GetPlayerMainStat()
         local BottomText = {}
 
         -- Check if the item is appropriate for the player's class.
         local CanEquip = WGLItemsDB.CanEquip(CompareItemID, select(2, UnitClass("player")))
         local IsAppropriate = WGLItemsDB.IsAppropriate(CompareItemID, select(2, UnitClass("player")))
-        local ItemHasMainStat = WGLUtil.ItemHasMainStat(itemLink, PlayerTopStat)
+        local ItemHasMainStat = WGLU.ItemHasMainStat(itemLink, PlayerTopStat)
+
+        -- Create variables
+        local slotName = GetItemSlotName(itemLink)
+        local slotID = GetInventorySlotInfo(slotName)
+        local ItemLoc = ItemLocation:CreateFromEquipmentSlot(slotID)
+        local CurrentItemIlvl = ItemLoc and ItemLoc:IsValid() and C_Item.GetCurrentItemLevel(ItemLoc) or 0
+        local CurrentItemLink = GetInventoryItemLink("player", slotID)
+        local IsUnique = false
+        local NoCompare = false
+        local IsBoP = bindType == Enum.ItemBind.OnAcquire and true or false
+        local CacheRequest = nil
+
+        -- We can't trade BoP items, so just show the item and stats.
+        if isBoP then NoCompare = true end
+        if not CurrentItemLink then NoCompare = true end
+
+        WGLU.DebugPrint("Item is BoP: " .. tostring(IsBoP))
 
         -- If this is a ring, or neck we dont need to worry about the main stat.
         if itemEquipLoc == "INVTYPE_FINGER" or itemEquipLoc == "INVTYPE_NECK" or itemEquipLoc == "INVTYPE_TRINKET" then
@@ -213,144 +217,128 @@ function AddLootFrame(player, itemLink)
         -- If we don't want to show unequippable items, and this item is not equippable, return.
         if WhoGotLootsSavedData.HideUnequippable == true and (CanEquip == false or IsAppropriate == false or ItemHasMainStat == false) then return end
 
-        -- We only worry about armor and weapons.
-        if itemType ~= "Armor" and itemType ~= "Weapon" then return end
+        -- -----------------------------------------------------------------------------------------------------------
+        -- Convert the Item if we're comparing rings, or trinkets, or offhands.
+        if itemEquipLoc == "INVTYPE_TRINKET" then
+
+            local trinket1 = GetInventoryItemLink("player", 13)
+            local trinket2 = GetInventoryItemLink("player", 14)
+            local trinket1id = trinket1 and select(1, C_Item.GetItemInfoInstant(trinket1)) or nil
+            local trinket2id = trinket2 and select(1, C_Item.GetItemInfoInstant(trinket2)) or nil
+            local trinket1Ilvl = trinket1 and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(13)) or 0
+            local trinket2Ilvl = trinket2 and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(14)) or 0
+
+            local trinketSlot = trinket1Ilvl < trinket2Ilvl and 13 or 14
+
+            -- Quick check to see if we have the same trinket.
+            if CompareItemID == trinket1id or CompareItemID == trinket2id then
+                -- If we have the same trinket, but it's at a lower ilvl, we want to show it.
+                local trinketSlot = (trinket1id == CompareItemID) and 13 or 14
+                if C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(trinketSlot)) < CompareItemIlvl then
+                    IsUnique = false
+                else
+                    IsUnique = true
+                end
+            end
+
+            CurrentItemIlvl = math.min(trinket1Ilvl, trinket2Ilvl)
+            CurrentItemLink = (trinket1Ilvl < trinket2Ilvl) and trinket1 or trinket2
+            slotID = trinketSlot
+
+        -- Same for ring
+        elseif itemEquipLoc == "INVTYPE_FINGER" then
+
+            local ring1 = GetInventoryItemLink("player", 11)
+            local ring2 = GetInventoryItemLink("player", 12)
+            local ring1id = ring1 and select(1, C_Item.GetItemInfoInstant(ring1)) or nil
+            local ring2id = ring2 and select(1, C_Item.GetItemInfoInstant(ring2)) or nil
+            local ring1Ilvl = ring1id and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(11)) or 0
+            local ring2Ilvl = ring2id and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(12)) or 0
+
+            local ringSlot = ring1Ilvl < ring2Ilvl and 11 or 12
+
+            -- Quick check to see if we have the same ring.
+            if CompareItemID == ring1id or CompareItemID == ring2id then
+                -- If we have the same ring, but it's at a lower ilvl, we want to show it.
+                ringSlot = (ring1id == CompareItemID) and 11 or 12
+                if C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(ringSlot)) < CompareItemIlvl then
+                    IsUnique = false
+                else
+                    IsUnique = true
+                end
+            end
+
+            CurrentItemIlvl = math.min(ring1Ilvl, ring2Ilvl)
+            CurrentItemLink = (ring1Ilvl < ring2Ilvl) and ring1 or ring2
+            slotID = ringSlot
+        end
+
+        -- If the item was looted by another player check to see if it was an item level upgrade for them.
+        -- This is kind of tricky, because the item may not be cached, so we need to asynchronously get the item, then update it later using the cache.
+        local upgradeForOtherPlayer = false
+        -- if CanEquip and IsAppropriate and ItemHasMainStat then
+            local otherItemLink = GetInventoryItemID(player, slotID)
+            if otherItemLink then
+                local otherPlayerItemIlvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(slotID))
+                if CompareItemIlvl > otherPlayerItemIlvl then
+                    table.insert(BottomText, "|cFFFF0000+" .. CompareItemIlvl - otherPlayerItemIlvl  .. " ilvl for " .. player .. "|r")
+                    upgradeForOtherPlayer = true
+                end
+            else
+                CacheRequest = { ["ItemLocation"] = slotID, ["ItemLevel"] = CompareItemIlvl }
+            end
+        -- end
 
         -- If we can equip this item, check if it's an upgrade.
-        if CanEquip == true and IsAppropriate == true and ItemHasMainStat then
+        if CanEquip == true and IsAppropriate == true and ItemHasMainStat == true and upgradeForOtherPlayer == false then
 
             -- First, check if we're at the minimum character level.
             if UnitLevel("player") < itemMinLevel then
                 table.insert(BottomText, "|cFFFF0000Level " .. itemMinLevel .. "|r")
             end
 
-            if WGLDEBUG then print("Item Loc: " .. itemEquipLoc) end
-
-            local slotName = GetItemSlotName(itemLink)
-            local slotID, _ = GetInventorySlotInfo(slotName)
-            local ItemLoc = ItemLocation:CreateFromEquipmentSlot(slotID)
-            local CurrentItemIlvl = ItemLoc and ItemLoc:IsValid() and C_Item.GetCurrentItemLevel(ItemLoc) or 0
-            local CurrentItemLink = GetInventoryItemLink("player", slotID)
-            local IsUnique = false
-            local IsDiffItemType = false
-
-            -- If we have something in the same slot (like off-hand) but it's not the same item type.
-            if CurrentItemLink and itemEquipLoc ~= select(9, GetItemInfo(CurrentItemLink)) then
-                IsDiffItemType = true
-            end
-
-            -- If this is a trinket, find the lowest ilvl trinket we have.
-            if itemEquipLoc == "INVTYPE_TRINKET" then
-                local trinket1 = GetInventoryItemLink("player", 13)
-                local trinket2 = GetInventoryItemLink("player", 14)
-                local trinket1id = select(1, C_Item.GetItemInfoInstant(trinket1))
-                local trinket2id = select(1, C_Item.GetItemInfoInstant(trinket2))
-                local trinket1Ilvl = trinket1 and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(13)) or 0
-                local trinket2Ilvl = trinket2 and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(14)) or 0
-
-                local trinketSlot = trinket1Ilvl < trinket2Ilvl and 13 or 14
-
-                -- Quick check to see if we have the same trinket.
-                if CompareItemID == trinket1id or CompareItemID == trinket2id then
-                    -- If we have the same trinket, but it's at a lower ilvl, we want to show it.
-                    local trinketSlot = (trinket1id == CompareItemID) and 13 or 14
-                    if C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(trinketSlot)) < CompareItemIlvl then
-                        IsUnique = false
-                    else
-                        IsUnique = true
-                    end
-                end
-
-                CurrentItemIlvl = math.min(trinket1Ilvl, trinket2Ilvl)
-                CurrentItemLink = (trinket1Ilvl < trinket2Ilvl) and trinket1 or trinket2
-                slotID = trinketSlot
-
-            -- Same for ring
-            elseif itemEquipLoc == "INVTYPE_FINGER" then
-                local ring1 = GetInventoryItemLink("player", 11)
-                local ring2 = GetInventoryItemLink("player", 12)
-                local ring1id = ring1 and select(1, C_Item.GetItemInfoInstant(ring1)) or nil
-                local ring2id = ring2 and select(1, C_Item.GetItemInfoInstant(ring2)) or nil
-                local ring1Ilvl = ring1id and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(11)) or 0
-                local ring2Ilvl = ring2id and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(12)) or 0
-
-                local ringSlot = ring1Ilvl < ring2Ilvl and 11 or 12
-
-                -- Quick check to see if we have the same ring.
-                if CompareItemID == ring1id or CompareItemID == ring2id then
-                    -- If we have the same ring, but it's at a lower ilvl, we want to show it.
-                    ringSlot = (ring1id == CompareItemID) and 11 or 12
-                    if C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(ringSlot)) < CompareItemIlvl then
-                        IsUnique = false
-                    else
-                        IsUnique = true
-                    end
-                end
-
-                CurrentItemIlvl = math.min(ring1Ilvl, ring2Ilvl)
-                CurrentItemLink = (ring1Ilvl < ring2Ilvl) and ring1 or ring2
-                slotID = ringSlot
-
-            -- If it's an offhand, we want to compare it to the main hand.
-            elseif itemEquipLoc == "INVTYPE_HOLDABLE" or itemEquipLoc == "INVTYPE_WEAPONOFFHAND" then
-                slotID = 16
-                CurrentItemLink = GetInventoryItemLink("player", slotID)
-                table.insert(BottomText, "Mainhand:")
-            end
+            WGLU.DebugPrint("Item Loc: " .. itemEquipLoc)
 
             -- If we have a unique equipped, then we don't want to show it.
             if IsUnique then 
                 table.insert(BottomText, "|cFFFF0000Unique Equipped|r")
             end
 
-            if not IsUnique then
 
+            if not IsUnique then 
                 -- Show the ilvl diff if any
-                local ilvlDiff = CompareItemIlvl - CurrentItemIlvl
+                local ilvlDiff = not NoCompare and CompareItemIlvl - CurrentItemIlvl or CompareItemIlvl
                 if ilvlDiff > 0 then
-                    table.insert(BottomText, "|cFF00FF00+" .. ilvlDiff .. "|r ilvl")
+                    table.insert(BottomText, "|cFF00FF00" .. (NoCompare and "" or "+") .. ilvlDiff .. "|r ilvl")
                 elseif ilvlDiff < 0 then
                     table.insert(BottomText, "|cFFFF0000" .. ilvlDiff .. "|r ilvl")
                 else
-                    table.insert(BottomText, "Same Ilvl")
+                    table.insert(BottomText, "+0 ilvl")
                 end
 
                 -- Get the compare item's stats.
                 local CompareItemStats = C_Item.GetItemStats(itemLink)
                 
-                -- Now, get the main stat of our currently equipped item (if we have one)
+                -- If we have an item equipped in the same slot, compare the main stats.
+                local CompareItemMainStat = CompareItemStats and WGLU.GetItemMainStat(CompareItemStats, PlayerTopStat) or -1
                 local diffStat = 0
-                if not IsDiffItemType and itemEquipLoc ~= "INVTYPE_HOLDABLE" and itemEquipLoc ~= "INVTYPE_WEAPONOFFHAND" then
+                local ourItemMainStat = CurrentItemLink and WGLU.GetItemMainStat(C_Item.GetItemStats(CurrentItemLink), PlayerTopStat) or 0
 
-                    local CompareItemMainStat = nil
-                    if CompareItemStats then
-                        CompareItemMainStat =  WGLUtil.GetItemMainStat(CompareItemStats, PlayerTopStat)
+                if CompareItemMainStat ~= -1 then
+                    diffStat = CompareItemMainStat - ourItemMainStat
+                else
+                    diffStat = 0
+                end
+
+                -- Create a text showing the difference in main stat.
+                local diffStatText = ""
+                if CompareItemMainStat ~= -1 then
+                    if diffStat >= 0 then
+                        diffStatText = "|cFF00FF00" .. (not NoCompare and "+" or "") .. diffStat .. "|r"
+                    elseif diffStat < 0 then
+                        diffStatText = "|cFFFF0000" .. diffStat .. "|r"
                     end
-
-                    -- If we have an item equipped in the same slot, compare the main stats.
-                    if CurrentItemLink and ourItemMainStat then
-
-                        ourItemMainStat = WGLUtil.GetItemMainStat(C_Item.GetItemStats(CurrentItemLink), PlayerTopStat)
-
-                        if CompareItemMainStat ~= nil then
-                            diffStat = CompareItemMainStat - ourItemMainStat
-                        elseif ourItemMainStat ~= nil then
-                            diffStat = -ourItemMainStat
-                        else
-                            diffStat = 0
-                        end
-                    end
-
-                    -- Create a text showing the difference in main stat.
-                    if diffStat ~= 0 then
-                        local diffStatText = ""
-                        if diffStat > 0 then
-                            diffStatText = "|cFF00FF00+" .. diffStat .. "|r"
-                        elseif diffStat < 0 then
-                            diffStatText = "|cFFFF0000" .. diffStat .. "|r"
-                        end
-                        table.insert(BottomText, diffStatText .. " " .. PlayerTopStat)
-                    end
+                    table.insert(BottomText, diffStatText .. " " .. PlayerTopStat)
                 end
 
                 -- If the item level is the same as what we have now, give a quick stat change breakdown.
@@ -384,7 +372,7 @@ function AddLootFrame(player, itemLink)
                     end
 
                     -- Get the stats of our currently equipped item.
-                    if CurrentItemLink then 
+                    if CurrentItemLink and not NoCompare then 
                         local ourItemStats = C_Item.GetItemStats(CurrentItemLink)
                         for stat, value in pairs(ourItemStats) do
                             if stat == "ITEM_MOD_HASTE_RATING_SHORT" then stats.Haste.ours = value
@@ -404,7 +392,7 @@ function AddLootFrame(player, itemLink)
                     for _, stat in ipairs(preferredOrder) do
                         local value = stats[stat]
                         local diff = value.theirs - value.ours
-                        local statName = WGLUtil.SimplifyStatName(stat)
+                        local statName = WGLU.SimplifyStatName(stat)
 
                         if statName ~= nil then
 
@@ -418,7 +406,7 @@ function AddLootFrame(player, itemLink)
                             -- Normal stat display
                             else
                                 if diff > 0 then
-                                    table.insert(BottomText, "|cFF00FF00+" .. diff .. "|r " .. statName)
+                                    table.insert(BottomText, "|cFF00FF00" .. (not NoCompare and "+" or "") .. diff .. "|r " .. statName)
                                 elseif diff < 0 then
                                     table.insert(BottomText, "|cFFFF0000" .. diff .. "|r " .. statName)
                                 end
@@ -428,15 +416,13 @@ function AddLootFrame(player, itemLink)
             end
         end
 
-        if WGLDEBUG then
-            print("CanEquip: " .. tostring(CanEquip) .. ", IsAppropriate: " .. tostring(IsAppropriate) .. ", ItemHasMainStat: " .. tostring(ItemHasMainStat))
-        end
+        WGLU.DebugPrint("CanEquip: " .. tostring(CanEquip) .. ", IsAppropriate: " .. tostring(IsAppropriate) .. ", ItemHasMainStat: " .. tostring(ItemHasMainStat))
 
         -- Display why we can't equip the item.
         if CanEquip == false then
-            table.insert(BottomText, "|cFFFF0000Can't equip " .. GetItemSubClassInfo(classID, subclassID) .. "|r")
+            table.insert(BottomText, "|cFFFF0000Can't equip " .. C_Item.GetItemSubClassInfo(classID, subclassID) .. "|r")
         elseif IsAppropriate == false then
-            table.insert(BottomText, "|cFFFF0000You don't wear " .. string.lower(GetItemSubClassInfo(classID, subclassID)) .. "|r")
+            table.insert(BottomText, "|cFFFF0000You don't wear " .. string.lower(C_Item.GetItemSubClassInfo(classID, subclassID)) .. "|r")
         elseif ItemHasMainStat == false then
             table.insert(BottomText, "|cFFFF0000No " .. PlayerTopStat .. "|r")
         end
@@ -455,12 +441,28 @@ function AddLootFrame(player, itemLink)
             -- Unhide the main window
             WhoLootData.MainFrame:Open()
 
+            -- Create cache request
+            if CacheRequest then
+                CacheRequest["Frame"] = frame
+                CacheRequest["CompareIlvl"] = CompareItemIlvl
+                CacheRequest["TextString"] = table.concat(BottomText, ", ")
+                WGLCache.CreateRequest(UnitGUID(player), CacheRequest)
+                NotifyInspect(player)
+                frame.LoadingIcon:Show()
+            end
+
             frame.Player = player
             local playerClass = select(2, UnitClass(player))
-            frame.PlayerText:SetText("|c" .. RAID_CLASS_COLORS[playerClass].colorStr .. player:sub(1, 8) .. "|r")
+            frame.PlayerText:SetText("|c" .. RAID_CLASS_COLORS[playerClass].colorStr .. UnitName(player):sub(1, 10) .. "|r")
             frame.PlayerText:Show()
-            frame.ItemText:SetText("|c" .. select(4, GetItemQualityColor(itemQuality)) .. "[" .. itemName  .. "]" .. "|r")
-            frame.BottomText:SetText(table.concat(BottomText, ", "))
+            frame.ItemText:SetText("|c" .. select(4, C_Item.GetItemQualityColor(itemQuality)) .. "[" .. itemName  .. "]" .. "|r")
+
+            if not CacheRequest then
+                frame.BottomText:SetText(table.concat(BottomText, ", "))
+            else 
+                frame.BottomText:SetText("Inspecting...")
+            end
+            
             frame.Icon:SetTexture(itemTexture)
             frame.Item = itemLink
             frame:DropIn(1.0, 0.2)
@@ -478,8 +480,8 @@ function AddLootFrame(player, itemLink)
                     if player == GetUnitName("player") then
                         local currentTime = GetTime()
                         if currentTime - self.lastClickTime < 0.4 then
-                            if WGLDEebug then print("Equipping " .. itemLink) end
-                            EquipItemByName(itemLink)
+                            if WGLDEBUG then print("Equipping " .. itemLink) end
+                            C_Item.EquipItemByName(itemLink)
                             self.Close:CloseFrame()
                         end
                         self.lastClickTime = currentTime
@@ -522,19 +524,19 @@ function WhoLootData.HoverFrame(fromFrame, toState)
 
             if fromFrame.HoverAnimDelta == nil then fromFrame.HoverAnimDelta = 0 end
             fromFrame.HoverAnimDelta = fromFrame.HoverAnimDelta + elapsed * 2
-            local progress = WGLUtil.Clamp(fromFrame.HoverAnimDelta / WhoLootFrameData.HoverAnimTime, 0, 1)
+            local progress = WGLU.Clamp(fromFrame.HoverAnimDelta / WhoLootFrameData.HoverAnimTime, 0, 1)
             progress = math.sin(progress * math.pi / 2)
 
-            WGLUtil.LerpBackdropColor(fromFrame.background, WhoLootFrameData.HoverColor, WhoLootFrameData.ExitColor, 1 - progress)
+            WGLU.LerpBackdropColor(fromFrame.background, WhoLootFrameData.HoverColor, WhoLootFrameData.ExitColor, 1 - progress)
 
             fromFrame.PlayerText:SetAlpha(1 - progress)
             fromFrame.Icon:ClearAllPoints()
             fromFrame.Icon:SetPoint("TOPLEFT",
-                WGLUtil.LerpFloat(WhoLootFrameData.IconStartLeftPos, WhoLootFrameData.IconEndLeftPos, progress), WhoLootFrameData.IconTopPos)
+                WGLU.LerpFloat(WhoLootFrameData.IconStartLeftPos, WhoLootFrameData.IconEndLeftPos, progress), WhoLootFrameData.IconTopPos)
             fromFrame.Icon:SetAlpha(1 - progress)
             fromFrame.ItemText:ClearAllPoints()
             fromFrame.ItemText:SetPoint("TOPLEFT",
-                WGLUtil.LerpFloat(WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameEndLeftPos, progress), WhoLootFrameData.ItemNameTopPos)
+                WGLU.LerpFloat(WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameEndLeftPos, progress), WhoLootFrameData.ItemNameTopPos)
 
             if progress >= 1 then
                 fromFrame:SetScript("OnUpdate", nil) -- Stop the animation
@@ -548,19 +550,19 @@ function WhoLootData.HoverFrame(fromFrame, toState)
         if fromFrame.HoverAnimDelta == nil then fromFrame.HoverAnimDelta = WhoLootFrameData.HoverAnimTime end
         fromFrame:SetScript("OnUpdate", function(self, elapsed)
             fromFrame.HoverAnimDelta = fromFrame.HoverAnimDelta - elapsed
-            local progress = WGLUtil.Clamp(fromFrame.HoverAnimDelta / WhoLootFrameData.HoverAnimTime, 0, 1)
+            local progress = WGLU.Clamp(fromFrame.HoverAnimDelta / WhoLootFrameData.HoverAnimTime, 0, 1)
             progress = math.sin(progress * math.pi / 2)
 
-            WGLUtil.LerpBackdropColor(fromFrame.background, WhoLootFrameData.HoverColor, WhoLootFrameData.ExitColor, 1 - progress)
+            WGLU.LerpBackdropColor(fromFrame.background, WhoLootFrameData.HoverColor, WhoLootFrameData.ExitColor, 1 - progress)
 
             fromFrame.PlayerText:SetAlpha(1 - progress)
             fromFrame.Icon:ClearAllPoints()
             fromFrame.Icon:SetPoint("TOPLEFT",
-                WGLUtil.LerpFloat(WhoLootFrameData.IconStartLeftPos, WhoLootFrameData.IconEndLeftPos, progress), WhoLootFrameData.IconTopPos)
+                WGLU.LerpFloat(WhoLootFrameData.IconStartLeftPos, WhoLootFrameData.IconEndLeftPos, progress), WhoLootFrameData.IconTopPos)
             fromFrame.Icon:SetAlpha(1 - progress)
             fromFrame.ItemText:ClearAllPoints()
             fromFrame.ItemText:SetPoint("TOPLEFT",
-                WGLUtil.LerpFloat(WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameEndLeftPos, progress), WhoLootFrameData.ItemNameTopPos)
+                WGLU.LerpFloat(WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameEndLeftPos, progress), WhoLootFrameData.ItemNameTopPos)
             fromFrame.BottomText:ClearAllPoints()
             fromFrame.BottomText:SetPoint("TOPLEFT", fromFrame.ItemText, "BOTTOMLEFT", 0, -4)
 
@@ -593,26 +595,61 @@ end
 SLASH_WHOLOOT1 = "/whogotloots"
 SLASH_WHOLOOT2 = "/wgl"
 
--- Register the command handler
-SlashCmdList["WHOLOOT"] = function(msg, editbox)
-    if msg:sub(1, 3) == "add" then
-        local itemID = tonumber(msg:sub(5))
-        
-        if itemID then
-            AddLootFrame(GetUnitName("player"), itemID)
+-- Split the command into parts using spaces.
+-- We need to ignore the spaces though when it's inbetween the tags |c and |r so we don't split item links apart.
+local function SplitCommands(msg)
+    local args = {}
+    local currentArg = ""
+    local ignoreSpaces = false
+    for i = 1, #msg do
+        local char = msg:sub(i, i)
+        if char == " " and not ignoreSpaces then
+            if currentArg ~= "" then
+                table.insert(args, currentArg)
+                currentArg = ""
+            end
         else
-            -- Try parsing it as an itemLink.
-            local itemLink = msg:sub(5)
-            AddLootFrame(GetUnitName("player"), itemLink)
+            currentArg = currentArg .. char
+            if char == "|" then
+                ignoreSpaces = true
+            elseif char == "|r" then
+                ignoreSpaces = false
+            end
         end
-    elseif msg:sub(1, 5) == "debug" then
-        WGLDEBUG = not WGLDEBUG
-        print("Debug mode is now " .. (WGLDEBUG and "enabled" or "disabled"))
-    else
+    end
+    if currentArg ~= "" then
+        table.insert(args, currentArg)
+    end
+    return args
+end
+
+-- Register the command handler
+SlashCmdList["WHOLOOT"] = function(msg)
+
+    local args = SplitCommands(msg)
+    if #args == 0 then
         if WhoLootData.MainFrame:IsVisible() then
             WhoLootData.MainFrame:Close()
         else
             WhoLootData.MainFrame:Open()
         end
+        return
+    end
+
+    local cmd = args[1]
+    table.remove(args, 1)
+
+    if cmd == "add" then
+
+        -- Are we targeting someone right now?
+        if UnitExists("target") then
+            AddLootFrame("target", args[1])
+        else
+            -- If not, add it to the player.
+            AddLootFrame("player", args[1])
+        end
+    elseif cmd == "debug" then
+        WGLDEBUG = not WGLDEBUG
+        print("Debug mode is now " .. (WGLDEBUG and "enabled" or "disabled"))
     end
 end

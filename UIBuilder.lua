@@ -42,14 +42,14 @@ function WGLUIBuilder.CreateMainFrame()
         mainFrame.infoTooltip:Show()
         mainFrame.infoTooltip:SetAlpha(0)
         mainFrame.infoTooltip:SetScript("OnUpdate", function(self, elapsed)
-            self:SetAlpha(WGLUtil.Clamp(self:GetAlpha() + elapsed * 5, 0, 1))
+            self:SetAlpha(WGLU.Clamp(self:GetAlpha() + elapsed * 5, 0, 1))
         end)
     end)
     mainFrame.infoBtn:SetScript("OnLeave", function()
         mainFrame.infoBtn.Btn:SetVertexColor(0.7, 0.7, 0.7, 1);
         -- Fade the tooltip out over 1 seconds.
         mainFrame.infoTooltip:SetScript("OnUpdate", function(self, elapsed)
-            self:SetAlpha(WGLUtil.Clamp(self:GetAlpha() - elapsed * 2, 0, 1))
+            self:SetAlpha(WGLU.Clamp(self:GetAlpha() - elapsed * 2, 0, 1))
             if self:GetAlpha() == 0 then
                 self:Hide()
                 self:SetScript("OnUpdate", nil)
@@ -59,13 +59,13 @@ function WGLUIBuilder.CreateMainFrame()
 
     -- Create an information tooltip to show when the info button is hovered.
     mainFrame.infoTooltip = CreateFrame("Frame", nil, UIParent)
-    mainFrame.infoTooltip:SetSize(270, 75)
+    mainFrame.infoTooltip:SetSize(270, 95)
     mainFrame.infoTooltip:SetPoint("BOTTOMLEFT", mainFrame.infoBtn, "TOPLEFT", -15, 0)
     mainFrame.infoTooltip:SetFrameLevel(4)
     mainFrame.infoTooltip.Text = mainFrame.infoTooltip:CreateFontString(nil, "OVERLAY", "WGLFont_Tooltip")
-    mainFrame.infoTooltip.Text:SetAllPoints(true)
+    mainFrame.infoTooltip.Text:SetAllPoints()
     mainFrame.infoTooltip.Text:SetPoint("TOPLEFT", mainFrame.infoTooltip, "TOPLEFT", 15, -0)
-    mainFrame.infoTooltip.Text:SetText("- Double left click to equip the item (if it's your loot).\n- Shift + left click to link the item in chat.\n- Right click to dismiss the item.")
+    mainFrame.infoTooltip.Text:SetText("- Double left click to equip the item (if it's your loot).\n- Shift + left click to link the item in chat.\n- Right click to dismiss the item.\n- Rings and Trinket will compare to your lowest item level one.")
     mainFrame.infoTooltip.Text:SetJustifyH("LEFT")
     mainFrame.infoTooltip.Text:SetSpacing(4)
     mainFrame.infoTooltip:SetScale(1.4)
@@ -75,7 +75,7 @@ function WGLUIBuilder.CreateMainFrame()
     WGLUIBuilder.DrawSlicedBG(mainFrame.infoTooltip, "OptionsWindowBG", "backdrop", 6)
     WGLUIBuilder.ColorBGSlicedFrame(mainFrame.infoTooltip, "backdrop", 1, 1, 1, 0.95)
     mainFrame.infoTooltip.Border = CreateFrame("Frame", nil, mainFrame.infoTooltip)
-    mainFrame.infoTooltip.Border:SetAllPoints(true)
+    mainFrame.infoTooltip.Border:SetAllPoints()
     WGLUIBuilder.DrawSlicedBG(mainFrame.infoTooltip.Border, "EdgedBorder", "border", 6)
     WGLUIBuilder.ColorBGSlicedFrame(mainFrame.infoTooltip.Border, "border", 0.5, 0.5, 0.5, 1)
 
@@ -93,19 +93,19 @@ function WGLUIBuilder.CreateMainFrame()
     mainFrame.cursorFrame.HoverAnimDelta = 1
     mainFrame.cursorFrame.MoveAmount = -60
     mainFrame.cursorFrame.LastElapsed = -1
-    mainFrame.cursorFrame.IsDragging = false
+    mainFrame.cursorFrame.BeingDragged = false
 
     -- Make the main frame movable.
     mainFrame.cursorFrame:SetMovable(true)
     mainFrame.cursorFrame:EnableMouse(true)
     mainFrame.cursorFrame:RegisterForDrag("LeftButton")
     mainFrame.cursorFrame:SetScript("OnDragStart", function(self)
-        IsDragging = true
+        self.BeingDragged = true
         self:StartMoving()
     end)
     mainFrame.cursorFrame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        IsDragging = false
+        self.BeingDragged = false
         local point, relativeTo, relativePoint, xOfs, yOfs = mainFrame.cursorFrame:GetPoint()
         WhoGotLootsSavedData.SavedPos = { point, relativeTo, relativePoint, xOfs, yOfs }
     end)
@@ -117,7 +117,7 @@ function WGLUIBuilder.CreateMainFrame()
         if not WhoLootData.MainFrame:IsVisible() then return end
 
         -- Keep the main frame stuck to the cursor frame.
-        if self.IsDragging then
+        if self.BeingDragged then
             mainFrame:SetPoint("CENTER", mainFrame.cursorFrame, "CENTER", 0, 0)
         end
         self.CursorOver = self:IsMouseOver()
@@ -130,9 +130,9 @@ function WGLUIBuilder.CreateMainFrame()
         end
 
         if self.CursorOver then
-            self.HoverAnimDelta = WGLUtil.Clamp(self.HoverAnimDelta + elapsed * 8, 0, 1)
+            self.HoverAnimDelta = WGLU.Clamp(self.HoverAnimDelta + elapsed * 8, 0, 1)
         else
-            self.HoverAnimDelta = WGLUtil.Clamp(self.HoverAnimDelta - elapsed * 4, 0, 1)
+            self.HoverAnimDelta = WGLU.Clamp(self.HoverAnimDelta - elapsed * 4, 0, 1)
         end
 
         -- Save on CPU cycles by only updating whenever the cursor enters or leaves the frame.
@@ -260,9 +260,6 @@ function WGLUIBuilder.DrawSlicedBG(frame, textureKey, layer, shrink)
         end
         tex = group[key];
         tex:SetTexture(file, nil, nil, "LINEAR");
-        if data.disableSharpening then
-            DisableSharpening(tex)
-        end
         if key == 2 or key == 8 then
             if key == 2 then
                 tex:SetPoint("TOPLEFT", group[1], "TOPRIGHT", 0, 0);
