@@ -26,41 +26,42 @@ local function HandleItemRecieved()
 
             request["Time"] = request["Time"] + WGLCache_Frequency
 
-            -- Gotta convert the playerGUID into a unit token.
+            -- Convert the playerGUID into a unit token.
             local unitName = WGLU.GetPlayerUnitByGUID(playerGUID)
+            if unitName then
 
-            if not unitName then
+                local itemLink = GetInventoryItemLink(unitName, request["ItemLocation"])
+                if itemLink then
+
+                    -- Was it an item level increase for this player?
+                    local itemLevel = C_Item.GetDetailedItemLevelInfo(itemLink)
+                    local playerName = select(6, GetPlayerInfoByGUID(playerGUID))
+
+                    if itemLevel < request["ItemLevel"] then
+                        request["Frame"].BottomText2:SetText("|cFFe28743+" .. request["ItemLevel"] - itemLevel  .. " ilvl upgrade for " .. playerName .. "|r")
+                    else
+                        request["Frame"].BottomText2:SetText("Them: " .. (itemLevel - request["ItemLevel"]) .. " ilvl downgrade |cFF00FF00[Tradeable]|r")
+                    end
+                    if request["TextString"] ~= "" then
+                        request["Frame"].BottomText2:SetText(request["Frame"].BottomText2:GetText() .. ', ' .. request["TextString"])
+                    end
+
+                    request["Frame"].LoadingIcon:FadeOut()
+
+                    -- Remove the request from the cache.
+                    WGL_Request_Cache[playerGUID] = nil
+                else
+                    -- Has this request gone on too long?
+                    if request["Time"] > WGLCache_Timeout then
+                        request["Frame"].BottomText2:SetText(request["TextString"])
+                        request["Frame"].LoadingIcon:FadeOut()
+                        WGLU.DebugPrint("Request for " .. playerGUID .. " has timed out.")
+                        WGL_Request_Cache[playerGUID] = nil
+                    end
+                end
+            else
                 WGLU.DebugPrint("Player not found for " .. playerGUID)
                 WGL_Request_Cache[playerGUID] = nil
-            end
-
-            local itemLink = GetInventoryItemLink(unitName, request["ItemLocation"])
-            if itemLink then
-
-                WGLU.DebugPrint("Completed a query for " .. playerGUID .. " for item " .. itemLink)
-
-                -- Was it an item level increase for this player?
-                local itemLevel = C_Item.GetDetailedItemLevelInfo(itemLink)
-                local playerName = select(6, GetPlayerInfoByGUID(playerGUID))
-
-                if itemLevel < request["ItemLevel"] then
-                    request["Frame"].BottomText:SetText("|cFFFF0000+" .. request["ItemLevel"] - itemLevel  .. " ilvl for " .. playerName .. "|r")
-                else
-                    request["Frame"].BottomText:SetText(request["TextString"])
-                end
-
-                request["Frame"].LoadingIcon:FadeOut()
-
-                -- Remove the request from the cache.
-                WGL_Request_Cache[playerGUID] = nil
-            else
-                -- Has this request gone on too long?
-                if request["Time"] > WGLCache_Timeout then
-                    request["Frame"].BottomText:SetText(request["TextString"])
-                    request["Frame"].LoadingIcon:FadeOut()
-                    WGLU.DebugPrint("Request for " .. playerGUID .. " has timed out.")
-                    WGL_Request_Cache[playerGUID] = nil
-                end
             end
         end
     end

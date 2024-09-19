@@ -245,18 +245,14 @@ function WGLUIBuilder.DrawSlicedBG(frame, textureKey, layer, shrink)
     local file = "Interface\\AddOns\\WhoGotLoots\\Art\\" .. data.file;
     local cornerSize = data.cornerSize;
     local coord = data.cornerCoord;
-    local offset = cornerSize * (data.offsetRatio or 0);
     local buildOrder = {1, 3, 7, 9, 2, 4, 6, 8, 5};
     local tex, key;
-    local isNewTexture;
 
     for i = 1, 9 do
         key = buildOrder[i];
         if not group[key] then
             group[key] = frame:CreateTexture(nil, "BACKGROUND", nil, subLevel);
-            isNewTexture = true;
         else
-            isNewTexture = false;
         end
         tex = group[key];
         tex:SetTexture(file, nil, nil, "LINEAR");

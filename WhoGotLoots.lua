@@ -1,6 +1,6 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-WhoLootDataVers = "1.2.0"
+WhoLootDataVers = "1.2.1"
 WGLDEBUG = false
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
@@ -78,6 +78,7 @@ end)
 
 local function GetItemSlotName(itemLink)
     local equipLoc = select(9, C_Item.GetItemInfo(itemLink))
+    WGLU.DebugPrint("Equip Loc: " .. equipLoc)
     local equipLocToSlotName = {
         INVTYPE_HEAD = "HeadSlot",
         INVTYPE_NECK = "NeckSlot",
@@ -97,9 +98,9 @@ local function GetItemSlotName(itemLink)
         INVTYPE_WEAPONMAINHAND = "MainHandSlot",
         INVTYPE_WEAPONOFFHAND = "SecondaryHandSlot",
         INVTYPE_HOLDABLE = "SecondaryHandSlot",
-        INVTYPE_RANGED = "RangedSlot",
+        INVTYPE_RANGED = "MainHandSlot",
         INVTYPE_THROWN = "RangedSlot",
-        INVTYPE_RANGEDRIGHT = "MainHandSlot",
+        INVTYPE_RANGEDRIGHT = "RangedSlot",
         INVTYPE_RELIC = "RangedSlot",
         INVTYPE_TABARD = "TabardSlot",
         INVTYPE_BODY = "ShirtSlot"
@@ -186,6 +187,7 @@ function AddLootFrame(player, itemLink)
         -- Grab the player's main stat.
         local PlayerTopStat = WGLU.GetPlayerMainStat()
         local BottomText = {}
+        local BottomText2 = {}
 
         -- Check if the item is appropriate for the player's class.
         local CanEquip = WGLItemsDB.CanEquip(CompareItemID, select(2, UnitClass("player")))
@@ -194,6 +196,7 @@ function AddLootFrame(player, itemLink)
 
         -- Create variables
         local slotName = GetItemSlotName(itemLink)
+        WGLU.DebugPrint("Slot Name: " .. slotName)
         local slotID = GetInventorySlotInfo(slotName)
         local ItemLoc = ItemLocation:CreateFromEquipmentSlot(slotID)
         local CurrentItemIlvl = ItemLoc and ItemLoc:IsValid() and C_Item.GetCurrentItemLevel(ItemLoc) or 0
@@ -276,18 +279,18 @@ function AddLootFrame(player, itemLink)
         -- If the item was looted by another player check to see if it was an item level upgrade for them.
         -- This is kind of tricky, because the item may not be cached, so we need to asynchronously get the item, then update it later using the cache.
         local upgradeForOtherPlayer = false
-        -- if CanEquip and IsAppropriate and ItemHasMainStat then
+        if player ~= "player" then
             local otherItemLink = GetInventoryItemID(player, slotID)
             if otherItemLink then
                 local otherPlayerItemIlvl = C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(slotID))
                 if CompareItemIlvl > otherPlayerItemIlvl then
-                    table.insert(BottomText, "|cFFFF0000+" .. CompareItemIlvl - otherPlayerItemIlvl  .. " ilvl for " .. player .. "|r")
+                    table.insert(BottomText2, "|cFFFF0000+" .. CompareItemIlvl - otherPlayerItemIlvl  .. " ilvl for " .. player .. "|r")
                     upgradeForOtherPlayer = true
                 end
             else
                 CacheRequest = { ["ItemLocation"] = slotID, ["ItemLevel"] = CompareItemIlvl }
             end
-        -- end
+        end
 
         -- If we can equip this item, check if it's an upgrade.
         if CanEquip == true and IsAppropriate == true and ItemHasMainStat == true and upgradeForOtherPlayer == false then
@@ -422,7 +425,7 @@ function AddLootFrame(player, itemLink)
         if CanEquip == false then
             table.insert(BottomText, "|cFFFF0000Can't equip " .. C_Item.GetItemSubClassInfo(classID, subclassID) .. "|r")
         elseif IsAppropriate == false then
-            table.insert(BottomText, "|cFFFF0000You don't wear " .. string.lower(C_Item.GetItemSubClassInfo(classID, subclassID)) .. "|r")
+            table.insert(BottomText, "|cFFFF0000You don't use " .. string.lower(C_Item.GetItemSubClassInfo(classID, subclassID)) .. "|r")
         elseif ItemHasMainStat == false then
             table.insert(BottomText, "|cFFFF0000No " .. PlayerTopStat .. "|r")
         end
@@ -445,22 +448,56 @@ function AddLootFrame(player, itemLink)
             if CacheRequest then
                 CacheRequest["Frame"] = frame
                 CacheRequest["CompareIlvl"] = CompareItemIlvl
-                CacheRequest["TextString"] = table.concat(BottomText, ", ")
+                CacheRequest["TextString"] = table.concat(BottomText2, " ")
                 WGLCache.CreateRequest(UnitGUID(player), CacheRequest)
                 NotifyInspect(player)
                 frame.LoadingIcon:Show()
             end
 
-            frame.Player = player
+            -- Sort the BottomText stat breakdown. We want upgraded things to be first.
+            table.sort(BottomText, function(a, b)
+                return a:find("+") and not b:find("+")
+            end)
+
+            -- Make sure that the entry with "ilvl" is always first.
+            for i, text in ipairs(BottomText) do
+                if text:find("ilvl") then
+                    table.insert(BottomText, 1, text)
+                    table.remove(BottomText, i + 1)
+                    break
+                end
+            end
+
             local playerClass = select(2, UnitClass(player))
-            frame.PlayerText:SetText("|c" .. RAID_CLASS_COLORS[playerClass].colorStr .. UnitName(player):sub(1, 10) .. "|r")
+            frame.Player = player
+            frame.PlayerText:SetText("|c" .. RAID_CLASS_COLORS[playerClass].colorStr .. UnitName(player) .. "|r")
             frame.PlayerText:Show()
             frame.ItemText:SetText("|c" .. select(4, C_Item.GetItemQualityColor(itemQuality)) .. "[" .. itemName  .. "]" .. "|r")
+            frame.BottomText2:SetText("")
 
-            if not CacheRequest then
-                frame.BottomText:SetText(table.concat(BottomText, ", "))
-            else 
-                frame.BottomText:SetText("Inspecting...")
+            -- If we don't have anything in the BottomText2 string, then use BottomText and BottomText2 to split the text.
+            if #BottomText2 == 0 and not CacheRequest then
+
+                -- Move the last half of the BottomText to BottomText2.
+                local half = math.ceil(#BottomText / 2) + 1
+                for i = half, #BottomText do
+                    table.insert(BottomText2, BottomText[i])
+                    BottomText[i] = nil
+                end
+
+                -- Insert some some blank space at the beginning of BottomText2
+                local bottomTextCombined = "         " .. table.concat(BottomText2, " ")
+
+                frame.BottomText:SetText('You: ' .. table.concat(BottomText, " "))
+                frame.BottomText2:SetText(bottomTextCombined)
+            else
+                frame.BottomText:SetText('You: ' .. table.concat(BottomText, " "))
+
+                if not CacheRequest then
+                    frame.BottomText2:SetText(table.concat(BottomText2, " "))
+                else
+                    frame.BottomText2:SetText("Inspecting ...")
+                end
             end
             
             frame.Icon:SetTexture(itemTexture)
@@ -472,29 +509,8 @@ function AddLootFrame(player, itemLink)
             WhoLootData.ActiveFrames[#WhoLootData.ActiveFrames + 1] = frame
             WhoLootData.ResortFrames()
 
-            -- Set left clicking functions to add the item link to the chat box, and to equip item.
-            frame:SetScript("OnMouseDown", function(self, button)
-                if IsShiftKeyDown() then
-                    ChatEdit_InsertLink(itemLink)
-                else
-                    if player == GetUnitName("player") then
-                        local currentTime = GetTime()
-                        if currentTime - self.lastClickTime < 0.4 then
-                            if WGLDEBUG then print("Equipping " .. itemLink) end
-                            C_Item.EquipItemByName(itemLink)
-                            self.Close:CloseFrame()
-                        end
-                        self.lastClickTime = currentTime
-                    end
-                end
-            end)
-
-            -- Right click to close it.
-            frame:SetScript("OnMouseUp", function(self, button)
-                if button == "RightButton" then
-                    self.Close:CloseFrame()
-                end
-            end)
+            -- Setup hover/click functions
+            WhoLootData.SetupItemBoxFunctions(frame, itemLink, player)
 
             -- Play a sound
             if WhoGotLootsSavedData.SoundEnabled == true or WhoGotLootsSavedData.SoundEnabled == nil then
@@ -502,6 +518,33 @@ function AddLootFrame(player, itemLink)
             end
         else
             print("ERROR: Couldn't find an available frame from pool. This shouldn't happen.")
+        end
+    end)
+end
+
+function WhoLootData.SetupItemBoxFunctions(frame, itemLink, player)
+
+    -- Set left clicking functions to add the item link to the chat box, and to equip item.
+    frame:SetScript("OnMouseDown", function(self, button)
+        if IsShiftKeyDown() then
+            ChatEdit_InsertLink(itemLink)
+        else
+            if player == GetUnitName("player") then
+                local currentTime = GetTime()
+                if currentTime - self.lastClickTime < 0.4 then
+                    if WGLDEBUG then print("Equipping " .. itemLink) end
+                    C_Item.EquipItemByName(itemLink)
+                    self.Close:CloseFrame()
+                end
+                self.lastClickTime = currentTime
+            end
+        end
+    end)
+
+    -- Right click to close it.
+    frame:SetScript("OnMouseUp", function(self, button)
+        if button == "RightButton" then
+            self.Close:CloseFrame()
         end
     end)
 end
@@ -582,7 +625,7 @@ function WhoLootData.ResortFrames()
     local numFrames = #WhoLootData.ActiveFrames
     for i, frame in ipairs(WhoLootData.ActiveFrames) do
         frame:ClearAllPoints()
-        frame:SetPoint("TOP", WhoLootData.MainFrame, "BOTTOM", 0, (i - 1) * -36 + 6 )
+        frame:SetPoint("TOP", WhoLootData.MainFrame, "BOTTOM", 0, (i - 1) * -44 + 6 )
     end
 
     -- If there are no frames to show, and the option is enabled, hide the main window.

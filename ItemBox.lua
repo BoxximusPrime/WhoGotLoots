@@ -15,7 +15,7 @@ WhoLootFrameData.ItemNameEndLeftPos = 5
 WhoLootFrameData.BottomTextEndLeftPos = 5
 
 WhoLootFrameData.IconTopPos = -5
-WhoLootFrameData.ItemNameTopPos = -8
+WhoLootFrameData.ItemNameTopPos = -5
 WhoLootFrameData.BottomTextTopPos = -8
 
 WhoLootFrameData.FrameLifetime = 60
@@ -28,8 +28,8 @@ function WGL_FrameManager:CreateFrame()
 
     -- Create a new frame to display the player and item.
     local ItemFrame = CreateFrame("Frame", nil, nil)
-    ItemFrame:SetWidth(240)
-    ItemFrame:SetHeight(35)
+    ItemFrame:SetWidth(250)
+    ItemFrame:SetHeight(43)
     ItemFrame:SetClipsChildren(true)
     ItemFrame:SetFrameLevel(5)
     WhoGotLootsFrames[#WhoGotLootsFrames + 1] = ItemFrame
@@ -60,6 +60,9 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.PlayerText:SetPoint("LEFT", 10, 0)
     ItemFrame.PlayerText:SetParent(ItemFrame)
     ItemFrame.PlayerText:SetText("PlayerName")
+    ItemFrame.PlayerText:SetWidth(43)
+    ItemFrame.PlayerText:SetWordWrap(false)
+    ItemFrame.PlayerText:SetJustifyH("LEFT")
 
     -- Create a progress bar that will show the timer's progress.
     ItemFrame.ProgressBar = CreateFrame("StatusBar", nil, ItemFrame)
@@ -95,6 +98,12 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.BottomText:SetPoint("TOPLEFT", nil, "BOTTOMLEFT", 0, -4)
     ItemFrame.BottomText:SetParent(ItemFrame)
     ItemFrame.BottomText:SetText("Bottom Text")
+    ItemFrame.BottomText:SetJustifyV("TOP")
+
+    ItemFrame.BottomText2 = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_Item_StatBottomText")
+    ItemFrame.BottomText2:SetPoint("TOPLEFT", ItemFrame.BottomText, "BOTTOMLEFT", 0, 0)
+    ItemFrame.BottomText2:SetParent(ItemFrame)
+    ItemFrame.BottomText2:SetText("Bottom Text")
 
     -- Create a close button to remove the frame.
     ItemFrame.Close = CreateFrame("Button", nil, ItemFrame, "WGLCloseBtn")
@@ -206,6 +215,8 @@ function WGL_FrameManager:CreateFrame()
         self.ItemText:SetPoint("TOPLEFT", WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameTopPos)
         self.BottomText:ClearAllPoints()
         self.BottomText:SetPoint("TOPLEFT", ItemFrame.ItemText, "BOTTOMLEFT", 0, -4)
+        self.BottomText2:ClearAllPoints()
+        self.BottomText2:SetPoint("TOPLEFT", ItemFrame.BottomText, "BOTTOMLEFT", 0, -2)
         self.Animating = false
         self.HoverAnimDelta = nil
         self.Lifetime = WhoLootFrameData.FrameLifetime
