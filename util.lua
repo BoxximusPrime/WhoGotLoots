@@ -150,7 +150,9 @@ end
 -- Determine if an item has the specified mainstat.
 -- mainstat is a string, either "agility", "strength", or "intellect"
 function WGLU.ItemHasMainStat(itemLink, mainStat)
+
   local stats = C_Item.GetItemStats(itemLink)
+  if not stats then return false end
 
   local containsMainStat = false
   for stat in pairs(stats) do
@@ -164,4 +166,28 @@ function WGLU.ItemHasMainStat(itemLink, mainStat)
   end
 
   return containsMainStat
+end
+
+function WGLU.ItemQualityToText(quality)
+  if quality == 0 then return "|cFF9D9D9DPoor|r"
+  elseif quality == 1 then return "|cFFFFFFFFMeh|r"
+  elseif quality == 2 then return "|cFF1EFF00Okay|r"
+  elseif quality == 3 then return "|cFF0070DDNeat!|r"
+  elseif quality == 4 then return "|cFFA335EEOmgg|r"
+  elseif quality == 5 then return "|cFFFF8000OH SNAP|r"
+  elseif quality == 6 then return "|cFFE6CC80Artifact|r"
+  elseif quality == 7 then return "|cFF00CCFFHeirloom|r"
+  elseif quality == 9 then return "|cFF00FF96WoW Token|r"
+  else return "|cFF9D9D9DUnknown|r"
+  end
+end
+
+function WGLU.OverrideEvent(frame, event, newHandler)
+  local originalHandler = frame:GetScript(event)
+  frame:SetScript(event, function(...)
+    if originalHandler then
+      originalHandler(...)
+    end
+    newHandler(...)
+  end)
 end

@@ -181,6 +181,11 @@ function WGL_FrameManager:CreateFrame()
         end
     end
 
+    function ItemFrame.LoadingIcon:Unhide()
+        self:SetAlpha(1)
+        self:Show()
+    end
+
     function ItemFrame.LoadingIcon:FadeOut()
         self:SetScript("OnUpdate", function(self, elapsed)
             local newAlpha = self:GetAlpha() - elapsed
@@ -221,6 +226,7 @@ function WGL_FrameManager:CreateFrame()
         self.HoverAnimDelta = nil
         self.Lifetime = WhoLootFrameData.FrameLifetime
         self.InUse = false
+        self.QueuedRequest = nil
     end
 
     function ItemFrame:DropIn(targetScale, duration)

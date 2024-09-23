@@ -38,6 +38,22 @@ function WGLUIBuilder.CreateMainFrame()
     mainFrame.infoBtn:SetFrameLevel(3)
     mainFrame.infoBtn:SetScript("OnEnter", function()
         mainFrame.infoBtn.Btn:SetVertexColor(1, 1, 1, 1);
+
+        -- Would the top of the tooltip go off the screen? If so, move the anchor to the top right of the tooltip, and the left side of the info button
+        local top =  mainFrame.infoTooltip:GetTop()
+        top = top + mainFrame.infoTooltip:GetHeight()
+
+        -- Take the scale into account
+        top = top * mainFrame.infoTooltip:GetScale()
+
+        if top > GetScreenHeight() then
+            mainFrame.infoTooltip:ClearAllPoints()
+            mainFrame.infoTooltip:SetPoint("TOPRIGHT", mainFrame.infoBtn, "TOPLEFT", -9, 0)
+        else
+            mainFrame.infoTooltip:ClearAllPoints()
+            mainFrame.infoTooltip:SetPoint("BOTTOMLEFT", mainFrame.infoBtn, "TOPLEFT", -15, 0)
+        end
+
         -- Fade the tooltip in over 0.2 seconds.
         mainFrame.infoTooltip:Show()
         mainFrame.infoTooltip:SetAlpha(0)
@@ -59,13 +75,13 @@ function WGLUIBuilder.CreateMainFrame()
 
     -- Create an information tooltip to show when the info button is hovered.
     mainFrame.infoTooltip = CreateFrame("Frame", nil, UIParent)
-    mainFrame.infoTooltip:SetSize(270, 95)
+    mainFrame.infoTooltip:SetSize(270, 135)
     mainFrame.infoTooltip:SetPoint("BOTTOMLEFT", mainFrame.infoBtn, "TOPLEFT", -15, 0)
     mainFrame.infoTooltip:SetFrameLevel(4)
     mainFrame.infoTooltip.Text = mainFrame.infoTooltip:CreateFontString(nil, "OVERLAY", "WGLFont_Tooltip")
     mainFrame.infoTooltip.Text:SetAllPoints()
     mainFrame.infoTooltip.Text:SetPoint("TOPLEFT", mainFrame.infoTooltip, "TOPLEFT", 15, -0)
-    mainFrame.infoTooltip.Text:SetText("- Double left click to equip the item (if it's your loot).\n- Shift + left click to link the item in chat.\n- Right click to dismiss the item.\n- Rings and Trinket will compare to your lowest item level one.")
+    mainFrame.infoTooltip.Text:SetText("|cFFFFFFFFKey Bindings|r\n- Double left click to equip the item (if it's your loot).\n- Shift + left click to link the item in chat.\n- Right click to dismiss the item.\n- Alt + left click to try and inspect the player.\n- Ctrl + left click to open trade with the person.\n|CFFFFFFFFTips|r\n- Rings and Trinket will compare to your lowest item level one.")
     mainFrame.infoTooltip.Text:SetJustifyH("LEFT")
     mainFrame.infoTooltip.Text:SetSpacing(4)
     mainFrame.infoTooltip:SetScale(1.4)
@@ -162,7 +178,6 @@ function WGLUIBuilder.CreateMainFrame()
 
     function mainFrame:Close()
         mainFrame.cursorFrame:EnableMouse(false)
-        mainFrame.cursorFrame:SetMovable(false)
         mainFrame.cursorFrame.HoverAnimDelta = 0
         mainFrame.cursorFrame:SetAlpha(0)
         WhoLootData.MainFrame:Hide()
@@ -170,14 +185,13 @@ function WGLUIBuilder.CreateMainFrame()
 
     function mainFrame:Open()
         mainFrame.cursorFrame:EnableMouse(true)
-        mainFrame.cursorFrame:SetMovable(true)
         WhoLootData.MainFrame:Show()
     end
 
     function mainFrame:LockWindow(toState)
-        self.cursorFrame:SetAlpha(toState and 0 or 1)
-        self.cursorFrame:EnableMouse(not toState)
-        self.cursorFrame:SetMovable(not toState)
+        mainFrame.cursorFrame:SetAlpha(toState and 0 or 1)
+        mainFrame.cursorFrame:SetMovable(not toState)
+        mainFrame.cursorFrame:EnableMouse(not toState)
     end
 
     WGLUIBuilder.DrawSlicedBG(mainFrame.cursorFrame, "SelectionBox", "backdrop", 0)

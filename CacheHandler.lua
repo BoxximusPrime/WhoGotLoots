@@ -1,81 +1,167 @@
 -- Cache Variables.
 WGLCache = {}
 WGL_Request_Cache = {}
-WGLCache_Timeout = 3
+WGLCache_RetryTime = 2
+WGLCache_MaxRetries = 5
 WGLCache_Frequency = 0.5
+
+WGLCacheCurrentQuery = nil
+WGLCacheCacheStage = {
+    Sent = 1,    -- Inspect has been sent, waiting for a response.
+    Queued = 2,  -- Waiting for the previous query to finish.
+    Finished = 3 -- The item has been received. This will only show if for some reason something broke with handling the item.
+}
 
 -- This is called when an item that another player is wearing hasn't been cached by the client.
 -- We're going to add in the request data to the cache.
 -- Each entry is basically an attempt to try GetInventoryItemLink until it no longer returns nil, then update the frame it was shown on.
-function WGLCache.CreateRequest(playerGUID, request)
+function WGLCache.CreateRequest(unitName, request)
 
-    WGLU.DebugPrint("Requesting item for " .. playerGUID)
-
+    local playerGUID = UnitGUID(unitName)
     if playerGUID then
-        request["Time"] = 0
-        WGL_Request_Cache[playerGUID] = request
+        request.Time = 0
+        request.Tries = 0
+        request.UnitName = unitName
+        request.PlayerGUID = playerGUID
+        
+        -- Generate a random ID
+        local ID = math.floor(GetTime())
+        
+        -- Make sure we don't already have this ID.
+        while WGL_Request_Cache[ID] do ID = ID + 1 end
+        request.ID = ID
+
+        -- Add the request to the cache.
+        WGL_Request_Cache[ID] = request
+        
+        -- If we're not currently querying, then we can send the inspect request.
+        if WGLCacheCurrentQuery == nil then
+            WGLCacheCurrentQuery = request
+            request.Frame.BottomText2:SetText("Inspecting ...")
+            NotifyInspect(unitName)
+            request.QueryStage = WGLCacheCacheStage.Sent
+        else
+            request.Frame.BottomText2:SetText("Inspection Queued")
+            WGLU.DebugPrint("Can't queue now, waiting for " .. playerGUID)
+            request.QueryStage = WGLCacheCacheStage.Queued
+        end
+
+        return ID
     end
 end
 
-local function HandleItemRecieved()
-
-    -- We recieved a response from the server, re-try all the queued requests we have.
-    for playerGUID, request in pairs(WGL_Request_Cache) do
-
-        if request then
-
-            request["Time"] = request["Time"] + WGLCache_Frequency
-
-            -- Convert the playerGUID into a unit token.
-            local unitName = WGLU.GetPlayerUnitByGUID(playerGUID)
-            if unitName then
-
-                local itemLink = GetInventoryItemLink(unitName, request["ItemLocation"])
-                if itemLink then
-
-                    -- Was it an item level increase for this player?
-                    local itemLevel = C_Item.GetDetailedItemLevelInfo(itemLink)
-                    local playerName = select(6, GetPlayerInfoByGUID(playerGUID))
-
-                    if itemLevel < request["ItemLevel"] then
-                        request["Frame"].BottomText2:SetText("|cFFe28743+" .. request["ItemLevel"] - itemLevel  .. " ilvl upgrade for " .. playerName .. "|r")
-                    else
-                        request["Frame"].BottomText2:SetText("Them: " .. (itemLevel - request["ItemLevel"]) .. " ilvl downgrade |cFF00FF00[Tradeable]|r")
-                    end
-                    if request["TextString"] ~= "" then
-                        request["Frame"].BottomText2:SetText(request["Frame"].BottomText2:GetText() .. ', ' .. request["TextString"])
-                    end
-
-                    request["Frame"].LoadingIcon:FadeOut()
-
-                    -- Remove the request from the cache.
-                    WGL_Request_Cache[playerGUID] = nil
-                else
-                    -- Has this request gone on too long?
-                    if request["Time"] > WGLCache_Timeout then
-                        request["Frame"].BottomText2:SetText(request["TextString"])
-                        request["Frame"].LoadingIcon:FadeOut()
-                        WGLU.DebugPrint("Request for " .. playerGUID .. " has timed out.")
-                        WGL_Request_Cache[playerGUID] = nil
-                    end
-                end
-            else
-                WGLU.DebugPrint("Player not found for " .. playerGUID)
-                WGL_Request_Cache[playerGUID] = nil
-            end
+local function PrepareNextQuery()
+    WGLCacheCurrentQuery = nil
+    for ID, request in pairs(WGL_Request_Cache) do
+        if request.QueryStage == WGLCacheCacheStage.Queued then
+            WGLCacheCurrentQuery = request
+            NotifyInspect(request.UnitName)
+            request.QueryStage = WGLCacheCacheStage.Sent
+            break
         end
     end
 end
+
+function WGLCache.RemoveRequest(ID)
+    if WGL_Request_Cache[ID] then WGL_Request_Cache[ID] = nil end
+
+    -- If we've removed the current query, then we can prepare the next one.
+    if WGLCacheCurrentQuery and WGLCacheCurrentQuery["ID"] == ID then
+        PrepareNextQuery()
+    end
+end
+
+local function HandleInspections(fromTimer)
+    -- Create a list of keys to remove
+    local keysToRemove = {}
+
+    for ID, request in pairs(WGL_Request_Cache) do
+
+        if request.QueryStage == WGLCacheCacheStage.Sent then
+
+            -- Tick the timer for timeouts.
+            if fromTimer then
+                request.Time = request.Time + WGLCache_Frequency
+            end
+
+            -- Re-grab the unit name in case it's changed.
+            request.UnitName = WGLU.GetPlayerUnitByGUID(request.PlayerGUID)
+
+            -- If the request has timed out, then we'll remove it from the cache.
+            if request.Time > WGLCache_RetryTime and request.UnitName then
+
+                if CanInspect(request.UnitName) then
+                    WGLU.DebugPrint("Can inspect " .. request.UnitName)
+                    request.Tries = request.Tries + 1
+                    request.Time = 0
+    
+                    -- If we've tried too many times, then we'll remove the request.
+                    if request.Tries >= WGLCache_MaxRetries then
+                        table.insert(keysToRemove, ID)
+                        request.Frame.LoadingIcon:FadeOut()
+                        request.Frame.BottomText2:SetText("Couldn't inspect")
+                        request.QueryStage = WGLCacheCacheStage.Finished
+                        ClearInspectPlayer()
+                    else
+                        NotifyInspect(request.UnitName)
+                        request.Frame.BottomText2:SetText("Retrying")
+                        WGLU.DebugPrint("Retrying inspect for " .. request.UnitName)
+                    end
+                else
+                    WGLU.DebugPrint("Can't inspect " .. request.UnitName)
+                end
+            end
+
+            -- Keep attempting to get the item link until it's found.
+            if request.UnitName then
+                local itemLink = GetInventoryItemLink(request.UnitName, request.ItemLocation)
+
+                if itemLink then
+                    table.insert(keysToRemove, ID)
+                    request.QueryStage = WGLCacheCacheStage.Finished
+                    PrepareNextQuery()
+
+                    if InCombatLockdown() then WGLU.DebugPrint("Got item and was in combat") end
+
+                    -- Was it an item level increase for this player?
+                    local itemLevel = C_Item.GetDetailedItemLevelInfo(itemLink)
+                    local playerName = select(6, GetPlayerInfoByGUID(request.PlayerGUID))
+
+                    if itemLevel < request.ItemLevel then
+                        request.Frame.BottomText2:SetText("|cFFe28743+" .. request.ItemLevel - itemLevel  .. " ilvl upgrade for " .. playerName .. "|r")
+                    else
+                        request.Frame.BottomText2:SetText("Them: |cFF00FF00[Tradeable]|r " .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
+                    end
+                    if request.TextString ~= "" then
+                        request.Frame.BottomText2:SetText(request.Frame.BottomText2:GetText() .. ', ' .. request.TextString)
+                    end
+
+                    request.Frame.LoadingIcon:FadeOut()
+                end
+            else
+                request.Frame.LoadingIcon:FadeOut()
+                request.Frame.BottomText2:SetText("Couldn't find player")
+                WGLU.DebugPrint("No unit name found for GUID: " .. request.PlayerGUID)
+            end
+        end
+    end
+
+    -- Remove the keys marked for removal and start the next request
+    for _, ID in ipairs(keysToRemove) do
+        WGLCache.RemoveRequest(ID)
+    end
+end
+
 
 -- Create a frame that handles the GET_ITEM_INFO_RECEIVED event.
 -- This event is fired when the client receives information about an item from the server.
 -- We'll use this event to update the item frame's bottom text with the item's stats.
 local CacheHandler = CreateFrame("Frame")
-CacheHandler:RegisterEvent("ITEM_DATA_LOAD_RESULT")
+CacheHandler:RegisterEvent("INSPECT_READY")
 
 CacheHandler:SetScript("OnEvent", function(self, event, ...)
-    if event == "ITEM_DATA_LOAD_RESULT" then
-        HandleItemRecieved()
+    if event == "INSPECT_READY" then
+        HandleInspections(false)
     end
 end)
 
@@ -84,6 +170,6 @@ CacheHandler:SetScript("OnUpdate", function(self, elapsed)
     self.TimeSinceLastUpdate = (self.TimeSinceLastUpdate or 0) + elapsed
     if self.TimeSinceLastUpdate > WGLCache_Frequency then
         self.TimeSinceLastUpdate = 0
-        HandleItemRecieved()
+        HandleInspections(true)
     end
 end)

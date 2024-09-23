@@ -3,7 +3,7 @@ WhoLootsOptionsEntries = {}
 -- Create the options frame
 WhoLootsOptionsFrame = CreateFrame("Frame", nil, nil, "BackdropTemplate")
 WhoLootsOptionsFrame.name = "WhoLootsOptionsFrame"
-WhoLootsOptionsFrame:SetSize(200, 395)
+WhoLootsOptionsFrame:SetSize(220, 395)
 WhoLootData.OptionsFrame = WhoLootsOptionsFrame
 
 -- Make us a child of MainFrame, so we move with it.
@@ -25,6 +25,7 @@ function WhoLootsOptionsEntries.LoadOptions()
     if WhoGotLootsSavedData.ShowDuringRaid == nil then WhoGotLootsSavedData.ShowDuringRaid = true end
     if WhoGotLootsSavedData.ShowDuringLFR == nil then WhoGotLootsSavedData.ShowDuringLFR = false end
     if WhoGotLootsSavedData.ShowControlHints == nil then WhoGotLootsSavedData.ShowControlHints = true end
+    if WhoGotLootsSavedData.MinQuality == nil then WhoGotLootsSavedData.MinQuality = 3 end
 
     WhoLootsOptionsEntries.AutoClose:SetChecked(WhoGotLootsSavedData.AutoCloseOnEmpty)
     WhoLootsOptionsEntries.LockWindow:SetChecked(WhoGotLootsSavedData.LockWindow)
@@ -35,6 +36,11 @@ function WhoLootsOptionsEntries.LoadOptions()
     WhoLootsOptionsEntries.ShowDuringRaid:SetChecked(WhoGotLootsSavedData.ShowDuringRaid)
     WhoLootsOptionsEntries.ShowDuringLFR:SetChecked(WhoGotLootsSavedData.ShowDuringLFR)
     WhoLootsOptionsEntries.ControlHints:SetChecked(WhoGotLootsSavedData.ShowControlHints)
+    WhoLootsOptionsEntries.MinQualitySlider:SetValue(WhoGotLootsSavedData.MinQuality)
+
+    -- Set the minimum item quality text color
+    local r, g, b, hex = C_Item.GetItemQualityColor(WhoGotLootsSavedData.MinQuality)
+    WhoLootsOptionsEntries.MinQualitySlider.KeyLabel:SetText(WGLU.ItemQualityToText(WhoGotLootsSavedData.MinQuality))
 
     -- Set the moveable state of the main frame
     WhoLootData.MainFrame:LockWindow(WhoGotLootsSavedData.LockWindow)
@@ -122,7 +128,7 @@ local autoClose = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate"
 WGLUIBuilder.AddOnClick(autoClose, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.AutoCloseOnEmpty = tick; end)
 autoClose:SetText("Auto Close")
 autoClose:SetParent(contentFrame)
-autoClose:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 0, 0)
+autoClose:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 10, 0)
 WhoLootsOptionsEntries.AutoClose = autoClose
 -- Option text
 local autoClose_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
@@ -171,11 +177,42 @@ hideUnequippable_Desc:SetPoint("TOPLEFT", HideUnequippable, "BOTTOMLEFT", 15, -8
 hideUnequippable_Desc:SetText("Hides items that cannot be equipped.")
 hideUnequippable_Desc:SetParent(contentFrame)
 
+-- Slider: Set the minimum item quality (between 1, and 5)
+-- Create the label text.
+local minQualityLabel = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_Checkbox")
+minQualityLabel:SetPoint("TOPLEFT", hideUnequippable_Desc, "BOTTOMLEFT", -10, -20)
+minQualityLabel:SetText("Minimum Item Quality")
+minQualityLabel:SetParent(contentFrame)
+
+local minQualitySlider = CreateFrame("Slider", nil, contentFrame, "WGLSlider")
+minQualitySlider:SetWidth(150)
+minQualitySlider:SetHeight(5)
+minQualitySlider:SetPoint("TOPLEFT", minQualityLabel, "BOTTOMLEFT", 0, -20)
+minQualitySlider:SetMinMaxValues(1, 4)
+minQualitySlider:SetValueStep(1)
+minQualitySlider:SetObeyStepOnDrag(true)
+
+-- Create a function to handle the slider's value change
+minQualitySlider:SetScript("OnMouseUp", function(self, button)
+    local value = self:GetValue()
+    WhoGotLootsSavedData.MinQuality = value
+
+    -- set the thumb text color to match the quality of the item.
+    self.KeyLabel:SetText(WGLU.ItemQualityToText(value))
+
+end)
+WGLU.OverrideEvent(minQualitySlider, "OnValueChanged", function(self, value)
+    self.KeyLabel:SetText(WGLU.ItemQualityToText(value))
+end)
+
+
+WhoLootsOptionsEntries.MinQualitySlider = minQualitySlider
+
 -- Checkbox: Show During Raid
 local ShowDuringRaid = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(ShowDuringRaid, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowDuringRaid = tick; end)
 ShowDuringRaid.Label:SetText("Show During Raid")
-ShowDuringRaid:SetPoint("TOPLEFT", hideUnequippable_Desc, "BOTTOMLEFT", -15, -16)
+ShowDuringRaid:SetPoint("TOPLEFT", minQualitySlider, "BOTTOMLEFT", 0, -28)
 ShowDuringRaid:SetParent(contentFrame)
 WhoLootsOptionsEntries.ShowDuringRaid = ShowDuringRaid
 -- Option text
@@ -200,7 +237,7 @@ showDuringLFR_Desc:SetText("Show loot while in LFR.")
 local SoundToggle = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(SoundToggle, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.SoundEnabled = tick; end)
 SoundToggle.Label:SetText("Enable Sound")
-SoundToggle:SetPoint("TOPLEFT", showDuringLFR_Desc, "BOTTOMLEFT", -15, -16)
+SoundToggle:SetPoint("TOPLEFT", showDuringLFR_Desc, "BOTTOMLEFT", -30, -16)
 SoundToggle:SetParent(contentFrame)
 WhoLootsOptionsEntries.SoundToggle = SoundToggle
 -- Option text
@@ -213,7 +250,7 @@ soundToggle_Desc:SetParent(contentFrame)
 local controlHints = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(controlHints, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowControlHints = tick; end)
 controlHints.Label:SetText("Show Control Hints")
-controlHints:SetPoint("TOPLEFT", soundToggle_Desc, "BOTTOMLEFT", -30, -16)
+controlHints:SetPoint("TOPLEFT", soundToggle_Desc, "BOTTOMLEFT", -15, -16)
 controlHints:SetParent(contentFrame)
 WhoLootsOptionsEntries.ControlHints = controlHints
 -- Option text
