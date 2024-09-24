@@ -45,7 +45,7 @@ function WGLU.GetItemMainStat(ItemStats, findStat)
   local foundStats = {}
   for stat, value in pairs(ItemStats) do
       local matchName = ""
-      if stat == "ITEM_MOD_AGILITY_SHORT" then matchName = "agility" 
+      if stat == "ITEM_MOD_AGILITY_SHORT" then matchName = "agility"
       elseif stat == "ITEM_MOD_STRENGTH_SHORT" then matchName = "strength"
       elseif stat == "ITEM_MOD_INTELLECT_SHORT" then matchName = "intellect"
       end

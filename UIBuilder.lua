@@ -114,6 +114,7 @@ function WGLUIBuilder.CreateMainFrame()
     -- Make the main frame movable.
     mainFrame.cursorFrame:SetMovable(true)
     mainFrame.cursorFrame:EnableMouse(true)
+    mainFrame.cursorFrame.isLocked = false
     mainFrame.cursorFrame:RegisterForDrag("LeftButton")
     mainFrame.cursorFrame:SetScript("OnDragStart", function(self)
         self.BeingDragged = true
@@ -184,11 +185,12 @@ function WGLUIBuilder.CreateMainFrame()
     end
 
     function mainFrame:Open()
-        mainFrame.cursorFrame:EnableMouse(true)
+        if not mainFrame.cursorFrame.isLocked then mainFrame.cursorFrame:EnableMouse(true) end
         WhoLootData.MainFrame:Show()
     end
 
     function mainFrame:LockWindow(toState)
+        mainFrame.cursorFrame.isLocked = toState
         mainFrame.cursorFrame:SetAlpha(toState and 0 or 1)
         mainFrame.cursorFrame:SetMovable(not toState)
         mainFrame.cursorFrame:EnableMouse(not toState)

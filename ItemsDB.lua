@@ -31,11 +31,11 @@ function WGLItemsDB.IsAppropriate(item, class)
     end
 
     if isArmor then
-        if ClassAndGearDB[class]["armor"] ~= nill then
+        if ClassAndGearDB[class]["armor"] ~= nil then
             return ClassAndGearDB[class]["armor"][itemsubclass]
         end
     else
-        if ClassAndGearDB[class][spec] ~= nill and ClassAndGearDB[class][spec][itemsubclass] ~= nil then
+        if ClassAndGearDB[class][spec] ~= nil and ClassAndGearDB[class][spec][itemsubclass] ~= nil then
             return ClassAndGearDB[class][spec][itemsubclass]
         end
     end

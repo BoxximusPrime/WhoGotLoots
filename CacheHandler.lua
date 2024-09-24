@@ -114,9 +114,64 @@ local function HandleInspections(fromTimer)
 
             -- Keep attempting to get the item link until it's found.
             if request.UnitName then
-                local itemLink = GetInventoryItemLink(request.UnitName, request.ItemLocation)
 
-                if itemLink then
+                -- If the requested item is a ring or trinket, then we need to copmare to the unit's lowest one.
+                local isRing = request.ItemLocation == INVSLOT_FINGER1 or request.ItemLocation == INVSLOT_FINGER2
+                local isTrinket = request.ItemLocation == INVSLOT_TRINKET1 or request.ItemLocation == INVSLOT_TRINKET2
+
+                local ItemLink = nil
+                local ItemLink1, ItemLink2 = nil, nil
+
+                -- If it's a ring, then we need to find the lowest one.
+                if isRing then
+                    ItemLink1 = GetInventoryItemLink(request.UnitName, INVSLOT_FINGER1)
+                    ItemLink2 = GetInventoryItemLink(request.UnitName, INVSLOT_FINGER2)
+
+                    -- If both loaded, then we can compare.
+                    if ItemLink1 and ItemLink2 then
+
+                        -- Find which is lowest.
+                        local itemLevel1 = C_Item.GetDetailedItemLevelInfo(ItemLink1)
+                        local itemLevel2 = C_Item.GetDetailedItemLevelInfo(ItemLink2)
+
+                        if itemLevel1 < itemLevel2 then
+                            ItemLink = ItemLink1
+                        else
+                            ItemLink = ItemLink2
+                        end
+                    else
+                        -- If only one loaded, then wait for the other.
+                        return
+                    end
+
+                -- If it's a trinket, then we need to find the lowest one.
+                elseif isTrinket then
+                    ItemLink1 = GetInventoryItemLink(request.UnitName, INVSLOT_TRINKET1)
+                    ItemLink2 = GetInventoryItemLink(request.UnitName, INVSLOT_TRINKET2)
+
+                    -- If both loaded, then we can compare.
+                    if ItemLink1 and ItemLink2 then
+
+                        -- Find which is lowest.
+                        local itemLevel1 = C_Item.GetDetailedItemLevelInfo(ItemLink1)
+                        local itemLevel2 = C_Item.GetDetailedItemLevelInfo(ItemLink2)
+
+                        if itemLevel1 < itemLevel2 then
+                            ItemLink = ItemLink1
+                        else
+                            ItemLink = ItemLink2
+                        end
+                    else
+                        -- If only one loaded, then wait for the other.
+                        return
+                    end
+
+                -- Otherwise, just get the item in the same slot.
+                else
+                    ItemLink = GetInventoryItemLink(request.UnitName, request.ItemLocation)
+                end
+
+                if ItemLink then
                     table.insert(keysToRemove, ID)
                     request.QueryStage = WGLCacheCacheStage.Finished
                     PrepareNextQuery()
@@ -124,7 +179,7 @@ local function HandleInspections(fromTimer)
                     if InCombatLockdown() then WGLU.DebugPrint("Got item and was in combat") end
 
                     -- Was it an item level increase for this player?
-                    local itemLevel = C_Item.GetDetailedItemLevelInfo(itemLink)
+                    local itemLevel = C_Item.GetDetailedItemLevelInfo(ItemLink)
                     local playerName = select(6, GetPlayerInfoByGUID(request.PlayerGUID))
 
                     if itemLevel < request.ItemLevel then

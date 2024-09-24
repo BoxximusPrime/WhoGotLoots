@@ -1,6 +1,6 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-WhoLootDataVers = "1.3.0"
+WhoLootDataVers = "1.3.1"
 WGLDEBUG = false
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
@@ -165,21 +165,18 @@ function AddLootFrame(player, itemLink)
         local IsClassRestricted = false
 
         -- Get currently equipped item information
-        local CurrentSlotID = C_Transmog.GetSlotForInventoryType(C_Item.GetItemInventoryTypeByID(CompareItemID) + 1)
+        local CurrentSlotID = -1
+        
+        -- Necks don't have a transmog slot, rings and trinkets will be handled below.
+        if itemEquipLoc == "INVTYPE_NECK" then CurrentSlotID = 2
+        else CurrentSlotID = C_Transmog.GetSlotForInventoryType(C_Item.GetItemInventoryTypeByID(CompareItemID) + 1) end
+
         local CurrentItemLink = GetInventoryItemLink("player", CurrentSlotID)
         local CurrentItemIlvl = CurrentItemLink and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(CurrentSlotID)) or 0
 
         local IsUnique = false
         local NoCompare = false
-        local IsBoP = bindType == Enum.ItemBind.OnAcquire and true or false
         local CacheRequest = nil
-
-
-        -- We can't trade BoP items, so just show the item and stats.
-        if isBoP then NoCompare = true end
-        if not CurrentItemLink then NoCompare = true end
-
-        WGLU.DebugPrint("Item is BoP: " .. tostring(IsBoP))
 
         -- If this is a ring, or neck we dont need to worry about the main stat.
         if itemEquipLoc == "INVTYPE_FINGER" or itemEquipLoc == "INVTYPE_NECK" or itemEquipLoc == "INVTYPE_TRINKET" then
@@ -279,6 +276,11 @@ function AddLootFrame(player, itemLink)
         -- If we can equip this item, check if it's an upgrade.
         if CanEquip == true and IsAppropriate == true and ItemHasMainStat == true and upgradeForOtherPlayer == false and IsClassRestricted ~= true then
 
+            -- We can't trade BoP items, so just show the item and stats.
+            local IsBoP = (bindType == Enum.ItemBind.ToWoWAccount or bindType == Enum.ItemBind.ToBnetAccount or bindType == Enum.ItemBind.ToBnetAccountUntilEquipped)
+            if isBoP then NoCompare = true end
+            if not CurrentItemLink then NoCompare = true end
+
             -- First, check if we're at the minimum character level.
             if UnitLevel("player") < itemMinLevel then
                 table.insert(BottomText, "|cFFFF0000Level " .. itemMinLevel .. "|r")
@@ -292,7 +294,10 @@ function AddLootFrame(player, itemLink)
             end
 
 
-            if not IsUnique then 
+            if not IsUnique then
+
+                local StatString = {}
+
                 -- Show the ilvl diff if any
                 local ilvlDiff = not NoCompare and CompareItemIlvl - CurrentItemIlvl or CompareItemIlvl
                 if ilvlDiff > 0 then
@@ -311,6 +316,8 @@ function AddLootFrame(player, itemLink)
                 local diffStat = 0
                 local ourItemMainStat = CurrentItemLink and WGLU.GetItemMainStat(C_Item.GetItemStats(CurrentItemLink), PlayerTopStat) or 0
 
+                DevTool:AddData(CurrentItemLink, "stats")
+
                 if CompareItemMainStat ~= -1 then
                     diffStat = CompareItemMainStat - ourItemMainStat
                 else
@@ -328,78 +335,86 @@ function AddLootFrame(player, itemLink)
                     table.insert(BottomText, diffStatText .. " " .. PlayerTopStat)
                 end
 
-                -- If the item level is the same as what we have now, give a quick stat change breakdown.
-                --if itemEquipLoc ~= "INVTYPE_HOLDABLE" and itemEquipLoc ~= "INVTYPE_WEAPONOFFHAND" then
-                    local stats = {
-                        Haste = { ours = 0, theirs = 0 },
-                        Mastery = { ours = 0, theirs = 0 },
-                        Versatility = { ours = 0, theirs = 0 },
-                        Crit = { ours = 0, theirs = 0 },
-                        Vers = { ours = 0, theirs = 0 },
-                        Avoidance = { ours = 0, theirs = 0 },
-                        Leech = { ours = 0, theirs = 0 },
-                        Speed = { ours = 0, theirs = 0 },
-                        Indestructible = { ours = 0, theirs = 0 }
-                    }
+                local stats = {
+                    Haste = { ours = 0, theirs = 0 },
+                    Mastery = { ours = 0, theirs = 0 },
+                    Versatility = { ours = 0, theirs = 0 },
+                    Crit = { ours = 0, theirs = 0 },
+                    Vers = { ours = 0, theirs = 0 },
+                    Avoidance = { ours = 0, theirs = 0 },
+                    Leech = { ours = 0, theirs = 0 },
+                    Speed = { ours = 0, theirs = 0 },
+                    Indestructible = { ours = 0, theirs = 0 }
+                }
 
-                    local preferredOrder = { "Haste", "Mastery", "Versatility", "Crit", "Vers", "Avoidance", "Leech", "Speed", "Indestructible" }
+                local preferredOrder = { "Haste", "Mastery", "Versatility", "Crit", "Vers", "Avoidance", "Leech", "Speed", "Indestructible" }
 
-                    -- Get the stats of the item we're comparing to.
-                    for stat, value in pairs(CompareItemStats) do
-                        if stat == "ITEM_MOD_HASTE_RATING_SHORT" then stats.Haste.theirs = value
-                        elseif stat == "ITEM_MOD_MASTERY_RATING_SHORT" then stats.Mastery.theirs = value
-                        elseif stat == "ITEM_MOD_VERSATILITY" then stats.Versatility.theirs = value
-                        elseif stat == "ITEM_MOD_CRIT_RATING_SHORT" then stats.Crit.theirs = value
-                        elseif stat == "ITEM_MOD_VERSATILITY" then stats.Vers.theirs = value
-                        elseif stat == "ITEM_MOD_CR_AVOIDANCE_SHORT" then stats.Avoidance.theirs = value
-                        elseif stat == "ITEM_MOD_CR_LIFESTEAL_SHORT" then stats.Leech.theirs = value
-                        elseif stat == "ITEM_MOD_CR_SPEED_SHORT" then stats.Speed.theirs = value
-                        elseif stat == "ITEM_MOD_CR_STURDINESS_SHORT" then stats.Indestructible.theirs = value
+                -- Get the stats of the item we're comparing to.
+                for stat, value in pairs(CompareItemStats) do
+                    if stat == "ITEM_MOD_HASTE_RATING_SHORT" then stats.Haste.theirs = value
+                    elseif stat == "ITEM_MOD_MASTERY_RATING_SHORT" then stats.Mastery.theirs = value
+                    elseif stat == "ITEM_MOD_VERSATILITY" then stats.Versatility.theirs = value
+                    elseif stat == "ITEM_MOD_CRIT_RATING_SHORT" then stats.Crit.theirs = value
+                    elseif stat == "ITEM_MOD_VERSATILITY" then stats.Vers.theirs = value
+                    elseif stat == "ITEM_MOD_CR_AVOIDANCE_SHORT" then stats.Avoidance.theirs = value
+                    elseif stat == "ITEM_MOD_CR_LIFESTEAL_SHORT" then stats.Leech.theirs = value
+                    elseif stat == "ITEM_MOD_CR_SPEED_SHORT" then stats.Speed.theirs = value
+                    elseif stat == "ITEM_MOD_CR_STURDINESS_SHORT" then stats.Indestructible.theirs = value
+                    end
+                end
+
+                -- Get the stats of our currently equipped item.
+                if CurrentItemLink and not NoCompare then 
+                    local ourItemStats = C_Item.GetItemStats(CurrentItemLink)
+                    for stat, value in pairs(ourItemStats) do
+                        if stat == "ITEM_MOD_HASTE_RATING_SHORT" then stats.Haste.ours = value
+                        elseif stat == "ITEM_MOD_MASTERY_RATING_SHORT" then stats.Mastery.ours = value
+                        elseif stat == "ITEM_MOD_VERSATILITY" then stats.Versatility.ours = value
+                        elseif stat == "ITEM_MOD_CRIT_RATING_SHORT" then stats.Crit.ours = value
+                        elseif stat == "ITEM_MOD_VERSATILITY" then stats.Vers.ours = value
+                        elseif stat == "ITEM_MOD_CR_AVOIDANCE_SHORT" then stats.Avoidance.ours = value
+                        elseif stat == "ITEM_MOD_CR_LIFESTEAL_SHORT" then stats.Leech.ours = value
+                        elseif stat == "ITEM_MOD_CR_SPEED_SHORT" then stats.Speed.ours = value
+                        elseif stat == "ITEM_MOD_CR_STURDINESS_SHORT" then stats.Indestructible.ours = value
                         end
                     end
+                end
+                
+                -- Compare the stats.
+                for _, stat in ipairs(preferredOrder) do
+                    local value = stats[stat]
+                    local diff = value.theirs - value.ours
+                    local statName = WGLU.SimplifyStatName(stat)
 
-                    -- Get the stats of our currently equipped item.
-                    if CurrentItemLink and not NoCompare then 
-                        local ourItemStats = C_Item.GetItemStats(CurrentItemLink)
-                        for stat, value in pairs(ourItemStats) do
-                            if stat == "ITEM_MOD_HASTE_RATING_SHORT" then stats.Haste.ours = value
-                            elseif stat == "ITEM_MOD_MASTERY_RATING_SHORT" then stats.Mastery.ours = value
-                            elseif stat == "ITEM_MOD_VERSATILITY" then stats.Versatility.ours = value
-                            elseif stat == "ITEM_MOD_CRIT_RATING_SHORT" then stats.Crit.ours = value
-                            elseif stat == "ITEM_MOD_VERSATILITY" then stats.Vers.ours = value
-                            elseif stat == "ITEM_MOD_CR_AVOIDANCE_SHORT" then stats.Avoidance.ours = value
-                            elseif stat == "ITEM_MOD_CR_LIFESTEAL_SHORT" then stats.Leech.ours = value
-                            elseif stat == "ITEM_MOD_CR_SPEED_SHORT" then stats.Speed.ours = value
-                            elseif stat == "ITEM_MOD_CR_STURDINESS_SHORT" then stats.Indestructible.ours = value
+                    if statName ~= nil then
+
+                        -- Overrides for some stats.
+                        if(statName == "Indest") then
+                            if diff > 0 then
+                                table.insert(StatString, "|cFF00FF00+Indestructible|r")
+                            elseif diff < 0 then
+                                table.insert(StatString, "|cFFFF0000-Indestructible|r")
+                            end
+                        -- Normal stat display
+                        else
+                            if diff > 0 then
+                                table.insert(StatString, "|cFF00FF00" .. (not NoCompare and "+" or "") .. diff .. "|r " .. statName)
+                            elseif diff < 0 then
+                                table.insert(StatString, "|cFFFF0000" .. diff .. "|r " .. statName)
                             end
                         end
                     end
+                end
 
-                    -- Compare the stats.
-                    for _, stat in ipairs(preferredOrder) do
-                        local value = stats[stat]
-                        local diff = value.theirs - value.ours
-                        local statName = WGLU.SimplifyStatName(stat)
+                -- Sort the BottomText stat breakdown. We want upgraded things to be first.
+                table.sort(StatString, function(a, b)
+                    return a:find("+") and not b:find("+")
+                end)
 
-                        if statName ~= nil then
-
-                            -- Overrides for some stats.
-                            if(statName == "Indest") then
-                                if diff > 0 then
-                                    table.insert(BottomText, "|cFF00FF00+Indestructible|r")
-                                elseif diff < 0 then
-                                    table.insert(BottomText, "|cFFFF0000-Indestructible|r")
-                                end
-                            -- Normal stat display
-                            else
-                                if diff > 0 then
-                                    table.insert(BottomText, "|cFF00FF00" .. (not NoCompare and "+" or "") .. diff .. "|r " .. statName)
-                                elseif diff < 0 then
-                                    table.insert(BottomText, "|cFFFF0000" .. diff .. "|r " .. statName)
-                                end
-                            end
-                        end
-                    end
+                -- Add it to our BottomText.
+                for i, stat in ipairs(StatString) do
+                    table.insert(BottomText, stat)
+                end
             end
         end
 
@@ -409,7 +424,7 @@ function AddLootFrame(player, itemLink)
         if CanEquip == false then
             table.insert(BottomText, "|cFFFF0000Can't equip " .. C_Item.GetItemSubClassInfo(classID, subclassID) .. "|r")
         elseif IsAppropriate == false then
-            table.insert(BottomText, "|cFFFF0000You don't use " .. string.lower(C_Item.GetItemSubClassInfo(classID, subclassID)) .. "|r")
+            table.insert(BottomText, "|cFFe28743" .. string.lower(C_Item.GetItemSubClassInfo(classID, subclassID)) .. " - Undesired Type|r")
         elseif ItemHasMainStat == false then
             table.insert(BottomText, "|cFFFF0000No " .. PlayerTopStat .. "|r")
         end
@@ -436,11 +451,6 @@ function AddLootFrame(player, itemLink)
                 frame.QueuedRequest = WGLCache.CreateRequest(player, CacheRequest)
                 frame.LoadingIcon:Unhide()
             end
-
-            -- Sort the BottomText stat breakdown. We want upgraded things to be first.
-            table.sort(BottomText, function(a, b)
-                return a:find("+") and not b:find("+")
-            end)
 
             -- Make sure that the entry with "ilvl" is always first.
             for i, text in ipairs(BottomText) do
