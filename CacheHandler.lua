@@ -9,8 +9,24 @@ WGLCacheCurrentQuery = nil
 WGLCacheCacheStage = {
     Sent = 1,    -- Inspect has been sent, waiting for a response.
     Queued = 2,  -- Waiting for the previous query to finish.
-    Finished = 3 -- The item has been received. This will only show if for some reason something broke with handling the item.
+    Finished = 3, -- The item has been received. This will only show if for some reason something broke with handling the item.
+    Failed = 4    -- The inspect failed.
 }
+-- Create a debug frame that shows our cache requests.
+CacheDebugFrame = CreateFrame("Frame", "WGLCacheDebugFrame", UIParent)
+CacheDebugFrame:SetSize(300, 200)
+CacheDebugFrame:SetPoint("TOPLEFT", 100, -100)
+-- CacheDebugFrame:Hide()
+
+CacheDebugFrame.BG = CacheDebugFrame:CreateTexture(nil, "BACKGROUND")
+CacheDebugFrame.BG:SetAllPoints()
+CacheDebugFrame.BG:SetColorTexture(0, 0, 0, 0.5)
+
+CacheDebugFrame.Text = CacheDebugFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+CacheDebugFrame.Text:SetPoint("TOPLEFT", 10, -10)
+CacheDebugFrame.Text:SetText("Cache Requests")
+CacheDebugFrame.Text:SetJustifyH("LEFT")
+
 
 -- This is called when an item that another player is wearing hasn't been cached by the client.
 -- We're going to add in the request data to the cache.
@@ -46,6 +62,7 @@ function WGLCache.CreateRequest(unitName, request)
             request.QueryStage = WGLCacheCacheStage.Queued
         end
 
+        UpdateQueueDebugList()
         return ID
     end
 end
@@ -72,140 +89,108 @@ function WGLCache.RemoveRequest(ID)
 end
 
 local function HandleInspections(fromTimer)
-    -- Create a list of keys to remove
     local keysToRemove = {}
 
+    local function GetLowestItemLink(unitName, slot1, slot2)
+        local itemLink1 = GetInventoryItemLink(unitName, slot1)
+        local itemLink2 = GetInventoryItemLink(unitName, slot2)
+
+        if itemLink1 and itemLink2 then
+            local itemLevel1 = C_Item.GetDetailedItemLevelInfo(itemLink1)
+            local itemLevel2 = C_Item.GetDetailedItemLevelInfo(itemLink2)
+            return itemLevel1 < itemLevel2 and itemLink1 or itemLink2
+        end
+        return nil
+    end
+
+    local function SetText(request, text)
+        if not request.Frame then return end
+        request.Frame.LoadingIcon:FadeOut()
+        request.Frame.BottomText2:SetText(text)
+    end
+
     for ID, request in pairs(WGL_Request_Cache) do
-
         if request.QueryStage == WGLCacheCacheStage.Sent then
-
-            -- Tick the timer for timeouts.
             if fromTimer then
                 request.Time = request.Time + WGLCache_Frequency
             end
 
-            -- Re-grab the unit name in case it's changed.
+            -- Keep updating the unit name, in case people leave/join
             request.UnitName = WGLU.GetPlayerUnitByGUID(request.PlayerGUID)
 
-            -- If the request has timed out, then we'll remove it from the cache.
-            if request.Time > WGLCache_RetryTime and request.UnitName then
-
-                if CanInspect(request.UnitName) then
-                    WGLU.DebugPrint("Can inspect " .. request.UnitName)
-                    request.Tries = request.Tries + 1
-                    request.Time = 0
-    
-                    -- If we've tried too many times, then we'll remove the request.
-                    if request.Tries >= WGLCache_MaxRetries then
-                        table.insert(keysToRemove, ID)
-                        request.Frame.LoadingIcon:FadeOut()
-                        request.Frame.BottomText2:SetText("Couldn't inspect")
-                        request.QueryStage = WGLCacheCacheStage.Finished
-                        ClearInspectPlayer()
-                    else
-                        NotifyInspect(request.UnitName)
-                        request.Frame.BottomText2:SetText("Retrying")
-                        WGLU.DebugPrint("Retrying inspect for " .. request.UnitName)
-                    end
+            -- Attempt to get the item link.
+            if request.UnitName and request.QueryStage ~= WGLCacheCacheStage.Finished then
+                local itemLink
+                if request.ItemLocation == INVSLOT_FINGER1 or request.ItemLocation == INVSLOT_FINGER2 then
+                    itemLink = GetLowestItemLink(request.UnitName, INVSLOT_FINGER1, INVSLOT_FINGER2)
+                elseif request.ItemLocation == INVSLOT_TRINKET1 or request.ItemLocation == INVSLOT_TRINKET2 then
+                    itemLink = GetLowestItemLink(request.UnitName, INVSLOT_TRINKET1, INVSLOT_TRINKET2)
                 else
-                    WGLU.DebugPrint("Can't inspect " .. request.UnitName)
-                end
-            end
-
-            -- Keep attempting to get the item link until it's found.
-            if request.UnitName then
-
-                -- If the requested item is a ring or trinket, then we need to copmare to the unit's lowest one.
-                local isRing = request.ItemLocation == INVSLOT_FINGER1 or request.ItemLocation == INVSLOT_FINGER2
-                local isTrinket = request.ItemLocation == INVSLOT_TRINKET1 or request.ItemLocation == INVSLOT_TRINKET2
-
-                local ItemLink = nil
-                local ItemLink1, ItemLink2 = nil, nil
-
-                -- If it's a ring, then we need to find the lowest one.
-                if isRing then
-                    ItemLink1 = GetInventoryItemLink(request.UnitName, INVSLOT_FINGER1)
-                    ItemLink2 = GetInventoryItemLink(request.UnitName, INVSLOT_FINGER2)
-
-                    -- If both loaded, then we can compare.
-                    if ItemLink1 and ItemLink2 then
-
-                        -- Find which is lowest.
-                        local itemLevel1 = C_Item.GetDetailedItemLevelInfo(ItemLink1)
-                        local itemLevel2 = C_Item.GetDetailedItemLevelInfo(ItemLink2)
-
-                        if itemLevel1 < itemLevel2 then
-                            ItemLink = ItemLink1
-                        else
-                            ItemLink = ItemLink2
-                        end
-                    else
-                        -- If only one loaded, then wait for the other.
-                        return
-                    end
-
-                -- If it's a trinket, then we need to find the lowest one.
-                elseif isTrinket then
-                    ItemLink1 = GetInventoryItemLink(request.UnitName, INVSLOT_TRINKET1)
-                    ItemLink2 = GetInventoryItemLink(request.UnitName, INVSLOT_TRINKET2)
-
-                    -- If both loaded, then we can compare.
-                    if ItemLink1 and ItemLink2 then
-
-                        -- Find which is lowest.
-                        local itemLevel1 = C_Item.GetDetailedItemLevelInfo(ItemLink1)
-                        local itemLevel2 = C_Item.GetDetailedItemLevelInfo(ItemLink2)
-
-                        if itemLevel1 < itemLevel2 then
-                            ItemLink = ItemLink1
-                        else
-                            ItemLink = ItemLink2
-                        end
-                    else
-                        -- If only one loaded, then wait for the other.
-                        return
-                    end
-
-                -- Otherwise, just get the item in the same slot.
-                else
-                    ItemLink = GetInventoryItemLink(request.UnitName, request.ItemLocation)
+                    itemLink = GetInventoryItemLink(request.UnitName, request.ItemLocation)
                 end
 
-                if ItemLink then
+                if itemLink then
                     table.insert(keysToRemove, ID)
                     request.QueryStage = WGLCacheCacheStage.Finished
-                    PrepareNextQuery()
 
-                    if InCombatLockdown() then WGLU.DebugPrint("Got item and was in combat") end
-
-                    -- Was it an item level increase for this player?
-                    local itemLevel = C_Item.GetDetailedItemLevelInfo(ItemLink)
+                    local itemLevel = C_Item.GetDetailedItemLevelInfo(itemLink)
                     local playerName = select(6, GetPlayerInfoByGUID(request.PlayerGUID))
 
                     if itemLevel < request.ItemLevel then
-                        request.Frame.BottomText2:SetText("|cFFe28743+" .. request.ItemLevel - itemLevel  .. " ilvl upgrade for " .. playerName .. "|r")
+                        request.Frame.BottomText2:SetText("|cFFe28743+" .. request.ItemLevel - itemLevel .. " ilvl upgrade for " .. playerName .. "|r")
                     else
-                        request.Frame.BottomText2:SetText("Them: |cFF00FF00[Tradeable]|r " .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
+                        if request.GoodForPlayer then
+                            request.Frame.BottomText2:SetText("Them: |cFF00FF00[Tradeable]|r " .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
+                        else
+                            request.Frame.BottomText2:SetText("Them: " .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
+                        end
                     end
                     if request.TextString ~= "" then
                         request.Frame.BottomText2:SetText(request.Frame.BottomText2:GetText() .. ', ' .. request.TextString)
                     end
 
                     request.Frame.LoadingIcon:FadeOut()
+                    UpdateQueueDebugList()
                 end
             else
-                request.Frame.LoadingIcon:FadeOut()
-                request.Frame.BottomText2:SetText("Couldn't find player")
-                WGLU.DebugPrint("No unit name found for GUID: " .. request.PlayerGUID)
+                if not request.UnitName and request.QueryStage == WGLCacheCacheStage.Finished then
+                    SetText("Couldn't find player")
+                end
+
+                if request.UnitName and request.QueryStage == WGLCacheCacheStage.Finished then
+                    SetText("Inspect timed out")
+                end
+            end
+
+            -- If we've been waiting for a while, then we'll retry the inspect.
+            if request.Time > WGLCache_RetryTime and request.UnitName and request.QueryStage ~= WGLCacheCacheStage.Finished then
+                if CanInspect(request.UnitName) then
+                    WGLU.DebugPrint("Can inspect " .. request.UnitName)
+                    request.Tries = request.Tries + 1
+                    request.Time = 0
+
+                    if request.Tries < WGLCache_MaxRetries then
+                        NotifyInspect(request.UnitName)
+                        WGLU.DebugPrint("Retrying inspect for " .. request.UnitName)
+                    else
+                        table.insert(keysToRemove, ID)
+                        SetText("Inspect timed out.")
+                        request.QueryStage = WGLCacheCacheStage.Failed
+                        ClearInspectPlayer()
+                    end
+                else
+                    WGLU.DebugPrint("Can't inspect " .. request.UnitName)
+                end
             end
         end
     end
 
-    -- Remove the keys marked for removal and start the next request
+    UpdateQueueDebugList()
     for _, ID in ipairs(keysToRemove) do
         WGLCache.RemoveRequest(ID)
     end
 end
+
 
 
 -- Create a frame that handles the GET_ITEM_INFO_RECEIVED event.
@@ -220,11 +205,65 @@ CacheHandler:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
+-- Maintain a second list of requests that we can use to debug the cache.
+-- We want these to expire slower than the actual cache requests.
+-- We'll update this list every 1 second.
+WGL_Request_Debug_Cache = {}
+
+function UpdateQueueDebugList()
+
+    if WGLU.DebugMode then CacheDebugFrame:Show() else CacheDebugFrame:Hide() end
+    if WGLU.DebugMode == false then return end
+
+    -- Copy the cache requests to the debug cache, except time.
+    for ID, request in pairs(WGL_Request_Cache) do
+        if not WGL_Request_Debug_Cache[ID] then
+            WGL_Request_Debug_Cache[ID] = {
+                UnitName = UnitName(request.UnitName),
+                ItemLocation = request.ItemLocation,
+                ItemLevel = request.ItemLevel,
+                QueryStage = request.QueryStage,
+                Time = 0
+            }
+        else
+            WGL_Request_Debug_Cache[ID].UnitName = UnitName(request.UnitName)
+            WGL_Request_Debug_Cache[ID].ItemLocation = request.ItemLocation
+            WGL_Request_Debug_Cache[ID].ItemLevel = request.ItemLevel
+            WGL_Request_Debug_Cache[ID].QueryStage = request.QueryStage
+        end
+    end
+
+    CacheDebugFrame.Text:SetText("Cache Requests")
+    local i = 1
+    for ID, request in pairs(WGL_Request_Debug_Cache) do
+        local text = "|cFFFFFFFFUnit:|r " .. request.UnitName .. ", |cFFFFFFFFItemLoc:|r " .. request.ItemLocation .. ", |cFFFFFFFFILevel:|r " .. request.ItemLevel
+        local stageNames = {
+            [WGLCacheCacheStage.Sent] = "Sent",
+            [WGLCacheCacheStage.Queued] = "Queued",
+            [WGLCacheCacheStage.Finished] = "Finished"
+        }
+        local stageName = stageNames[request.QueryStage] or "Unknown"
+        text = text .. "\n - |cFFFFFFFFStage:|r " .. stageName
+        CacheDebugFrame.Text:SetText(CacheDebugFrame.Text:GetText() .. "\n" .. text)
+        i = i + 1
+
+        request.Time = request.Time + WGLCache_Frequency
+    end
+
+    -- Remove any entries whose time is above 20 seconds.
+    for ID, request in pairs(WGL_Request_Debug_Cache) do
+        if request.Time > 60 then WGL_Request_Debug_Cache[ID] = nil end
+    end
+
+end
+
 -- Register a timer to the frame, that will check for requests every 1 seconds.
 CacheHandler:SetScript("OnUpdate", function(self, elapsed)
     self.TimeSinceLastUpdate = (self.TimeSinceLastUpdate or 0) + elapsed
     if self.TimeSinceLastUpdate > WGLCache_Frequency then
         self.TimeSinceLastUpdate = 0
         HandleInspections(true)
+
+        UpdateQueueDebugList()
     end
 end)

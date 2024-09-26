@@ -1,4 +1,5 @@
 WGLU = {}
+WGLU.DebugMode = false
 
  function WGLU.GetPlayerMainStat()
     local stats = {
@@ -144,7 +145,7 @@ function WGLU.GetPlayerUnitByGUID(guid)
 end
 
 function WGLU.DebugPrint(message)
-  if WGLDEBUG then print(message) end
+  if WGLU.DebugMode then print(message) end
 end
 
 -- Determine if an item has the specified mainstat.

@@ -1,7 +1,7 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-WhoLootDataVers = "1.3.1"
-WGLDEBUG = false
+WhoLootDataVers = "1.3.3"
+WGLU.DebugMode = false
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
 
@@ -265,6 +265,7 @@ function AddLootFrame(player, itemLink)
             if otherItemLink then
                 local otherPlayerItemIlvl = otherItemLink and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(CurrentSlotID)) or 0
                 if CompareItemIlvl > otherPlayerItemIlvl then
+                    WGLU.DebugPrint("Already had item data")
                     table.insert(BottomText2, "|cFFFF0000+" .. CompareItemIlvl - otherPlayerItemIlvl  .. " ilvl for " .. player .. "|r")
                     upgradeForOtherPlayer = true
                 end
@@ -315,8 +316,6 @@ function AddLootFrame(player, itemLink)
                 local CompareItemMainStat = CompareItemStats and WGLU.GetItemMainStat(CompareItemStats, PlayerTopStat) or -1
                 local diffStat = 0
                 local ourItemMainStat = CurrentItemLink and WGLU.GetItemMainStat(C_Item.GetItemStats(CurrentItemLink), PlayerTopStat) or 0
-
-                DevTool:AddData(CurrentItemLink, "stats")
 
                 if CompareItemMainStat ~= -1 then
                     diffStat = CompareItemMainStat - ourItemMainStat
@@ -447,6 +446,7 @@ function AddLootFrame(player, itemLink)
             if CacheRequest then
                 CacheRequest.Frame = frame
                 CacheRequest.CompareIlvl = CompareItemIlvl
+                CacheRequest.GoodForPlayer = CanEquip and IsAppropriate and not IsClassRestricted
                 CacheRequest.TextString = table.concat(BottomText2, " ")
                 frame.QueuedRequest = WGLCache.CreateRequest(player, CacheRequest)
                 frame.LoadingIcon:Unhide()
@@ -702,7 +702,7 @@ SlashCmdList["WHOLOOT"] = function(msg)
             AddLootFrame("player", args[1])
         end
     elseif cmd == "debug" then
-        WGLDEBUG = not WGLDEBUG
-        print("Debug mode is now " .. (WGLDEBUG and "enabled" or "disabled"))
+        WGLU.DebugMode = not WGLU.DebugMode
+        print("Debug mode is now " .. (WGLU.DebugMode and "enabled" or "disabled"))
     end
 end
