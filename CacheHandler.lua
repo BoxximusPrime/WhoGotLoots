@@ -137,16 +137,17 @@ local function HandleInspections(fromTimer)
                     local playerName = select(6, GetPlayerInfoByGUID(request.PlayerGUID))
 
                     if itemLevel < request.ItemLevel then
-                        request.Frame.BottomText2:SetText("|cFFFFFFFFThem: |cFFe28743+" .. request.ItemLevel - itemLevel .. " ilvl upgrade for " .. playerName .. "|r")
+                        SetText(request, "|cFFFFFFFFThem: |cFFe28743+" .. request.ItemLevel - itemLevel .. " ilvl upgrade for " .. playerName .. "|r")
                     else
                         if request.GoodForPlayer then
-                            request.Frame.BottomText2:SetText("|cFFFFFFFFThem:|r |cFFb7d672" .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
+                            if request.IsUpgrade then request.Frame:ShowUpgradeGlow() end
+                            SetText(request, "|cFFFFFFFFThem:|r |cFFb7d672" .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
                         else
-                            request.Frame.BottomText2:SetText("|cFFFFFFFFThem:|r " .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
+                           SetText(request, "|cFFFFFFFFThem:|r " .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
                         end
                     end
                     if request.TextString ~= "" then
-                        request.Frame.BottomText2:SetText(request.Frame.BottomText2:GetText() .. ', ' .. request.TextString)
+                        SetText(request, request.Frame.BottomText2:GetText() .. ', ' .. request.TextString)
                     end
 
                     request.Frame.LoadingIcon:FadeOut()
@@ -154,14 +155,14 @@ local function HandleInspections(fromTimer)
                 end
             end
 
-            if not request.UnitName and request.QueryStage == WGLCacheCacheStage.Finished then
+            if not request.UnitName then
                 table.insert(keysToRemove, ID)
-                SetText("Couldn't find player")
+                SetText(request, "Couldn't find player")
             end
 
-            if request.UnitName and request.QueryStage == WGLCacheCacheStage.Finished then
+            if request.QueryStage == WGLCacheCacheStage.Failed then
                 table.insert(keysToRemove, ID)
-                SetText("Inspect timed out")
+                SetText(request, "Inspect timed out")
             end
 
             -- If we've been waiting for a while, then we'll retry the inspect.
@@ -176,7 +177,7 @@ local function HandleInspections(fromTimer)
                         WGLU.DebugPrint("Retrying inspect for " .. request.UnitName)
                     else
                         table.insert(keysToRemove, ID)
-                        SetText("Inspect timed out.")
+                        SetText(request, "Inspect timed out.")
                         request.QueryStage = WGLCacheCacheStage.Failed
                         ClearInspectPlayer()
                     end
@@ -221,7 +222,7 @@ function UpdateQueueDebugList()
     for ID, request in pairs(WGL_Request_Cache) do
         if not WGL_Request_Debug_Cache[ID] then
             WGL_Request_Debug_Cache[ID] = {
-                UnitName = UnitName(request.UnitName) or "Unknown",
+                UnitName = request.UnitName and UnitName(request.UnitName) or "Unknown",
                 ItemLocation = request.ItemLocation,
                 ItemLevel = request.ItemLevel,
                 QueryStage = request.QueryStage,

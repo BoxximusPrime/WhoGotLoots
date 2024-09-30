@@ -36,6 +36,14 @@ function WhoLootsOptionsEntries.LoadOptions()
     WhoLootsOptionsEntries.ShowDuringLFR:SetChecked(WhoGotLootsSavedData.ShowDuringLFR)
     WhoLootsOptionsEntries.MinQualitySlider:SetValue(WhoGotLootsSavedData.MinQuality)
 
+    if WhoGotLootsSavedData.WhisperMessage ~= nil then
+        WhoLootsOptionsFrame.whisperPreview:SetText(WhoGotLootsSavedData.WhisperMessage)
+        WGLUIBuilder.WhisperEditor.EditBox:SetText(WhoGotLootsSavedData.WhisperMessage)
+    else
+        WGLUIBuilder.WhisperEditor.EditBox:SetText(WGLUIBuilder.DefaultWhisperMessage)
+    end
+    
+
     -- Set the minimum item quality text color
     local r, g, b, hex = C_Item.GetItemQualityColor(WhoGotLootsSavedData.MinQuality)
     WhoLootsOptionsEntries.MinQualitySlider.KeyLabel:SetText(WGLU.ItemQualityToText(WhoGotLootsSavedData.MinQuality))
@@ -121,12 +129,35 @@ local contentFrame = CreateFrame("Frame", "ContentFrame", scrollFrame)
 -- Set the scroll child
 scrollFrame:SetScrollChild(contentFrame)
 
--- Chekcbox: Auto Close Window
+-- Create a title for the whisper message
+local whisperTitle = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_Checkbox")
+whisperTitle:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 10, -6)
+whisperTitle:SetText("Whisper Message")
+
+-- Create a preview of the whisper message
+WhoLootsOptionsFrame.whisperPreview = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+WhoLootsOptionsFrame.whisperPreview:SetPoint("TOPLEFT", whisperTitle, "BOTTOMLEFT", 0, -6)
+WhoLootsOptionsFrame.whisperPreview:SetText("loading")
+WhoLootsOptionsFrame.whisperPreview:SetJustifyH("LEFT")
+WhoLootsOptionsFrame.whisperPreview:SetWidth(scrollFrame:GetWidth() - 20)
+
+-- Set Whisper Message Button
+local whisperMessageBtn = CreateFrame("Button", nil, contentFrame, "WGLGeneralButton")
+whisperMessageBtn:SetText("Set Whisper Message")
+whisperMessageBtn:SetPoint("TOPLEFT", WhoLootsOptionsFrame.whisperPreview, "BOTTOMLEFT", 0, -6)
+whisperMessageBtn:SetSize(110, 16)
+whisperMessageBtn:SetScript("OnClick", function(self)
+    WGLUIBuilder.WhisperEditor:Show()
+    PlaySound(170827)
+end)
+
+
+-- Checkbox: Auto Close Window
 local autoClose = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(autoClose, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.AutoCloseOnEmpty = tick; end)
 autoClose:SetText("Auto Close")
 autoClose:SetParent(contentFrame)
-autoClose:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 10, 0)
+autoClose:SetPoint("TOPLEFT", whisperMessageBtn, "BOTTOMLEFT", 0, -16)
 WhoLootsOptionsEntries.AutoClose = autoClose
 -- Option text
 local autoClose_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")

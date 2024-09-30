@@ -98,6 +98,65 @@
         </Scripts>
     </Button>
 
+    <Button name="WGLGeneralButton" virtual="true">
+        <Size x="70" y="15"/>
+        <Anchors>
+            <Anchor point="CENTER" relativePoint="CENTER" y="0"/>
+        </Anchors>
+        <Layers>
+            <Layer level="TEXT">
+                <FontString parentKey="Text" inherits="WGLFont_Checkbox" text="Button" justifyH="CENTER" justifyV="MIDDLE">
+                    <Size x="0" y="0"/>
+                    <Anchors>
+                        <Anchor point="CENTER" relativePoint="CENTER"/>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+        <Scripts>
+            <OnLoad>
+                self.Enabled = true
+                WGLUIBuilder.DrawSlicedBG(self, "BtnBG", "border", -2)
+                WGLUIBuilder.ColorBGSlicedFrame(self, "border", 0.1, 0.1, 0.1, 1)
+                WGLUIBuilder.DrawSlicedBG(self, "BtnBorder", "backdrop", -2)
+                WGLUIBuilder.ColorBGSlicedFrame(self, "backdrop", 0.3, 0.3, 0.3, 1)
+
+                function self:SetText(text)
+                    self.Text:SetText(text)
+                end
+
+                function self:SetEnabled(enabled)
+                    self.Enabled = enabled
+                    if enabled then
+                        WGLUIBuilder.ColorBGSlicedFrame(self, "backdrop", 0.3, 0.3, 0.3, 1)
+                        WGLUIBuilder.ColorBGSlicedFrame(self, "border", 0.1, 0.1, 0.1, 1)
+                        self.Text:SetTextColor(0.75, 0.75, 0.75)
+                    else
+                        WGLUIBuilder.ColorBGSlicedFrame(self, "backdrop", 0.2, 0.2, 0.2, 1)
+                        WGLUIBuilder.ColorBGSlicedFrame(self, "border", 0.3, 0.3, 0.3, 1)
+                        self.Text:SetTextColor(0.28, 0.28, 0.28)
+                    end
+                end
+
+                function self:IsEnabled()
+                    return self.Enabled
+                end
+            </OnLoad>
+            <OnEnter>
+                if self.Enabled == true then
+                    WGLUIBuilder.ColorBGSlicedFrame(self, "backdrop", 0.4, 0.4, 0.4, 1)
+                    WGLUIBuilder.ColorBGSlicedFrame(self, "border", 0.2, 0.2, 0.2, 1)
+                end
+            </OnEnter>
+            <OnLeave>
+                if self.Enabled == true then
+                    WGLUIBuilder.ColorBGSlicedFrame(self, "backdrop", 0.3, 0.3, 0.3, 1)
+                    WGLUIBuilder.ColorBGSlicedFrame(self, "border", 0.1, 0.1, 0.1, 1)
+                end
+            </OnLeave>
+        </Scripts>
+    </Button>
+
     <Button name="WGLInfoBtn" virtual="true">
         <Size x="24" y="24"/>
         <Anchors>

@@ -24,6 +24,8 @@ WhoLootFrameData.FrameLifetime = 60
 WhoLootFrameData.HoverColor = { 0.3, 0.3, 0.3, 1 }
 WhoLootFrameData.ExitColor = { 0.1, 0.1, 0.1, 1 }
 
+WhoLootFrameData.BorderColor = { 0.5, 0.5, 0.5, 1 }
+
 
 function WGL_FrameManager:CreateFrame()
 
@@ -48,12 +50,29 @@ function WGL_FrameManager:CreateFrame()
     WGLUIBuilder.DrawSlicedBG(ItemFrame.background, "ItemEntryBG", "backdrop", 0)
     WGLUIBuilder.ColorBGSlicedFrame(ItemFrame.background, "backdrop", 0.12, 0.1, 0.1, 0.85)
 
+    ItemFrame.UpgradeGlow = CreateFrame("Frame", nil, ItemFrame)
+    ItemFrame.UpgradeGlow:SetAllPoints()
+    ItemFrame.UpgradeGlow:SetFrameLevel(ItemFrame:GetFrameLevel() + 1)
+    WGLUIBuilder.DrawSlicedBG(ItemFrame.UpgradeGlow, "ItemEntryGlow", "backdrop", 0)
+    WGLUIBuilder.ColorBGSlicedFrame(ItemFrame.UpgradeGlow, "backdrop", 1, 1, 1, 1)
+    ItemFrame.UpgradeGlow:Hide()
+
+    function ItemFrame:ShowUpgradeGlow()
+        self.UpgradeGlow:Show()
+        -- Create an animation that makes it pulse.
+        self.UpgradeGlow:SetScript("OnUpdate", function(self, elapsed)
+            local alpha = 0.5 + math.cos(GetTime() * 3) * 0.5
+            WGLUIBuilder.ColorBGSlicedFrame(self, "backdrop", 1, 1, 1, alpha)
+        end)
+    end
+    function ItemFrame:HideUpgradeGlow() self.UpgradeGlow:Hide() end
+
     -- Create the border
     ItemFrame.border = CreateFrame("Frame", nil, ItemFrame);
     ItemFrame.border:SetAllPoints();
     ItemFrame.border:SetFrameLevel(ItemFrame:GetFrameLevel() + 1);
     WGLUIBuilder.DrawSlicedBG(ItemFrame.border, "ItemEntryBorder", "border", 0)
-    WGLUIBuilder.ColorBGSlicedFrame(ItemFrame.border, "border", 0.5, 0.5, 0.5, 1)
+    WGLUIBuilder.ColorBGSlicedFrame(ItemFrame.border, "border", unpack(WhoLootFrameData.BorderColor))
 
     -- Show the item's icon.
     ItemFrame.Icon = ItemFrame:CreateTexture(nil, "OVERLAY", nil, 7)
@@ -101,7 +120,7 @@ function WGL_FrameManager:CreateFrame()
 
     -- Show the item's name.
     ItemFrame.ItemText = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_ItemName")
-    ItemFrame.ItemText:SetPoint("TOPLEFT", 85, -8)
+    ItemFrame.ItemText:SetPoint("TOPLEFT", 85, -6)
     ItemFrame.ItemText:SetText("item name")
     ItemFrame.ItemText:SetParent(ItemFrame)
 
@@ -167,16 +186,17 @@ function WGL_FrameManager:CreateFrame()
     end
 
     function ItemFrame.LoadingIcon:FadeOut()
-        self:SetScript("OnUpdate", function(self, elapsed)
-            local newAlpha = self:GetAlpha() - elapsed
-            if newAlpha <= 0 then
-                self:SetAlpha(0)
-                self:SetScript("OnUpdate", nil)
-                self:Hide()
-            else
-                self:SetAlpha(newAlpha)
-            end
-        end)
+        self:SetAlpha(0)
+        -- self:SetScript("OnUpdate", function(self, elapsed)
+        --     local newAlpha = self:GetAlpha() - elapsed
+        --     if newAlpha <= 0 then
+        --         self:SetAlpha(0)
+        --         self:SetScript("OnUpdate", nil)
+        --         self:Hide()
+        --     else
+        --         self:SetAlpha(newAlpha)
+        --     end
+        -- end)
     end
 
     -- Animation/visual controls

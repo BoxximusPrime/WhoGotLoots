@@ -1,6 +1,6 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-WhoLootDataVers = "1.3.4"
+WhoLootDataVers = "1.4.0"
 WGLU.DebugMode = false
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
@@ -12,6 +12,8 @@ WhoLootData.MainFrame:SetDontSavePosition(true)
 -- Register Events --
 WhoLootData.MainFrame:RegisterEvent("ADDON_LOADED"); -- Fired when saved variables are loaded
 WhoLootData.MainFrame:RegisterEvent("CHAT_MSG_LOOT")
+
+WhoLootFrameData = WhoLootFrameData or {}
 
 -- Handle Events --
 function HandleEvents(self, event, ...)
@@ -31,6 +33,7 @@ function HandleEvents(self, event, ...)
         WhoLootData.MainFrame:SetScale(WhoGotLootsSavedData.SavedSize)
         WhoLootData.MainFrame.infoTooltip:SetScale(WhoGotLootsSavedData.SavedSize)
         WhoLootData.MainFrame.cursorFrame:SetScale(WhoGotLootsSavedData.SavedSize)
+        WGLUIBuilder.WhisperEditor:SetScale(WhoGotLootsSavedData.SavedSize)
 
         -- Parent all the item boxes to the main window.
         for i, frame in ipairs(WhoGotLootsFrames) do
@@ -206,6 +209,7 @@ function AddLootFrame(player, CompareItemLink)
         local NoCompare = false
         local CacheRequest = nil
         local IsClassRestricted = false
+        local IsDowngradeForOtherPlayer = UnitIsUnit('player', player) -- Logic is handled differnetly for the player, so we need to know if it's the player or not.
 
         local BottomText = {}
         local BottomText2 = {}
@@ -218,7 +222,7 @@ function AddLootFrame(player, CompareItemLink)
         -- We can't trade BoP items, so just show the item and stats.
         if C_Item.IsItemBindToAccountUntilEquip(CompareItemLink) then
             IsBoP = true
-            NoCompare = not UnitIsUnit("player", player)
+            NoCompare = not UnitIsUnit('player', player)
         end
 
         -- -----------------------------------------------------------------------------------------------------------
@@ -247,14 +251,15 @@ function AddLootFrame(player, CompareItemLink)
 
         -- If the item was looted by another player check to see if it was an item level upgrade for them.
         -- This is kind of tricky, because the item may not be cached, so we need to asynchronously get the item, then update it later using the cache.
-        if not UnitIsUnit("player", player) then
+        if not UnitIsUnit('player', player) then
             local otherItemLink = GetInventoryItemLink(player, CurrentSlotID)
             if otherItemLink then
-                local otherPlayerItemIlvl = otherItemLink and C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(CurrentSlotID)) or 0
+                local otherPlayerItemIlvl = otherItemLink and C_Item.GetDetailedItemLevelInfo(otherItemLink) or 0
                 if otherPlayerItemIlvl > CompareItemIlvl then
-                    table.insert(BottomText2, "|cFFFFFFFFThem:|r |cFF00FF00[Tradeable]|r " .. (otherPlayerItemIlvl - CompareItemIlvl) .. " ilvl downgrade")
+                    IsDowngradeForOtherPlayer = true
+                    table.insert(BottomText2, "|cFFFFFFFFThem:|r |cFFb7d672|r " .. (otherPlayerItemIlvl - CompareItemIlvl) .. " ilvl downgrade")
                 else
-                    table.insert(BottomText2, "|cFFFFFFFFThem:|r " .. (otherPlayerItemIlvl - CompareItemIlvl) .. " ilvl downgrade")
+                    table.insert(BottomText2, "|cFFFFFFFFThem:|r |cFFe28743" .. (otherPlayerItemIlvl - CompareItemIlvl) .. " ilvl upgrade|r")
                 end
             else
                 CacheRequest = { ["ItemLocation"] = CurrentSlotID, ["ItemLevel"] = CompareItemIlvl, ["ItemID"] = CompareItemID }
@@ -265,9 +270,6 @@ function AddLootFrame(player, CompareItemLink)
 
         -- If we can equip this item, check if it's an upgrade.
         if CanEquip == true and IsAppropriate == true and ItemHasMainStat == true and IsClassRestricted ~= true then
-
-            -- If we're good to compare stats
-            if not CurrentItemLink then NoCompare = true end
 
             -- First, check if we're at the minimum character level.
             if UnitLevel("player") < itemMinLevel then table.insert(BottomText, "|cFFFF0000Level " .. itemMinLevel .. "|r") end
@@ -449,16 +451,24 @@ function AddLootFrame(player, CompareItemLink)
             -- Unhide the main window
             WhoLootData.MainFrame:Open()
 
+            frame:HideUpgradeGlow()
+
             -- Create cache request
             if CacheRequest and not IsBoP then
                 CacheRequest.Frame = frame
                 CacheRequest.CompareIlvl = CompareItemIlvl
                 CacheRequest.GoodForPlayer = CanEquip and IsAppropriate and not IsClassRestricted
+                CacheRequest.IsUpgrade =  CompareItemIlvl > CurrentItemIlvl
                 CacheRequest.TextString = table.concat(BottomText2, " ")
                 frame.QueuedRequest = WGLCache.CreateRequest(player, CacheRequest)
                 frame.LoadingIcon:Unhide()
             else
                 frame.LoadingIcon:Hide()
+            end
+
+            -- Do we need to show the upgrade glow right now?
+            if not CacheRequest and not IsBoP and CanEquip and IsAppropriate and IsDowngradeForOtherPlayer and CompareItemIlvl > CurrentItemIlvl then
+                frame:ShowUpgradeGlow()
             end
 
             -- Make sure that the entry with "ilvl" is always first.
@@ -491,13 +501,13 @@ function AddLootFrame(player, CompareItemLink)
             -- If we're comparing items against someone else, and we have the data, show the comparison.
             local CompareItemAppend = ""
             if not NoCompare then
-                CompareItemAppend = not UnitIsUnit("player", player) and "|cFFFFFFFFYou:|r " or ""
+                CompareItemAppend = not UnitIsUnit('player', player) and "|cFFFFFFFFYou:|r " or ""
             end
 
             if IsBoP then CompareItemAppend = CompareItemAppend .. "|cFF6fcbe3Is BoP|r " end
 
             -- If we don't have anything in the BottomText2 string, then use BottomText and BottomText2 to split the text.
-            if #BottomText2 == 0 and #BottomText > 3 and not CacheRequest and UnitIsUnit("player", player) then
+            if #BottomText2 == 0 and #BottomText > 3 and not CacheRequest and UnitIsUnit('player', player) then
                 -- Move the last half of the BottomText to BottomText2.
                 local half = math.ceil(#BottomText / 2) + 1
                 for i = half, #BottomText do
@@ -553,7 +563,7 @@ function WhoLootData.SetupItemBoxFunctions(frame, itemLink, player)
                 ChatEdit_InsertLink(itemLink)
             -- Inspect
             elseif IsAltKeyDown() then
-                if not UnitIsUnit("player", player) and UnitPlayerControlled(player) and not InCombatLockdown() and CheckInteractDistance(player, 1) and CanInspect(player) then
+                if not UnitIsUnit('player', player) and UnitPlayerControlled(player) and not InCombatLockdown() and CheckInteractDistance(player, 1) and CanInspect(player) then
                     WGLU.DebugPrint("Inspecting " .. player)
                     InspectUnit(player)
                 end
@@ -562,13 +572,13 @@ function WhoLootData.SetupItemBoxFunctions(frame, itemLink, player)
                 end
             -- Open Trade
             elseif IsControlKeyDown() then
-                if not UnitIsUnit("player", player) and UnitPlayerControlled(player) and CheckInteractDistance(player, 2) then
+                if not UnitIsUnit('player', player) and UnitPlayerControlled(player) and CheckInteractDistance(player, 2) then
                     WGLU.DebugPrint("Who Got Loots - Initiating trade with " .. player)
                     InitiateTrade(player)
                 end
             -- Double clicked to equip
             else
-                if UnitIsUnit("player", player) or player == "player" then
+                if UnitIsUnit('player', player) or player == "player" then
                     local currentTime = GetTime()
                     WGLU.DebugPrint(currentTime - self.lastClickTime)
                     if currentTime - self.lastClickTime < 0.4 then
@@ -579,6 +589,16 @@ function WhoLootData.SetupItemBoxFunctions(frame, itemLink, player)
                     self.lastClickTime = currentTime
                 end
             end
+        end
+        if button == "MiddleButton" then
+            -- Whisper the player
+            if player == "player" then player = UnitName("player") end
+            
+            local messsage = WhoGotLootsSavedData.WhisperMessage
+            messsage = messsage:gsub("%%n", player)
+            messsage = messsage:gsub("%%i", itemLink)
+
+            SendChatMessage(messsage, "WHISPER", nil, UnitName(player))
         end
         if button == "RightButton" then
             WGLCache.RemoveRequest(frame.QueuedRequest)
@@ -643,7 +663,7 @@ function WhoLootData.ResortFrames()
     local numFrames = #WhoLootData.ActiveFrames
     for i, frame in ipairs(WhoLootData.ActiveFrames) do
         frame:ClearAllPoints()
-        frame:SetPoint("TOP", WhoLootData.MainFrame, "BOTTOM", 0, (i - 1) * -(frame:GetHeight() - 3) + 8 )
+        frame:SetPoint("TOP", WhoLootData.MainFrame, "BOTTOM", 0, (i - 1) * -(frame:GetHeight() - 0) + 8 )
     end
 
     -- If there are no frames to show, and the option is enabled, hide the main window.

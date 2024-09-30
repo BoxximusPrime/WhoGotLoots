@@ -1,5 +1,9 @@
 WGLUIBuilder = WGLUIBuilder or {}
 
+WGLUIBuilder.WhisperMsgMaxChars = 160
+WGLUIBuilder.WhisperDefaultMessage = "Greetings, %n! I sense you hold %i. If it does not align with your destiny, would you consider trading it? Many thanks!"
+WGLUIBuilder.TempWhisperMesage = ""
+
 function WGLUIBuilder.CreateMainFrame()
 
     -- Create the main frame.
@@ -38,19 +42,6 @@ function WGLUIBuilder.CreateMainFrame()
     mainFrame.infoBtn:SetFrameLevel(3)
     mainFrame.infoBtn:SetScript("OnEnter", function()
         mainFrame.infoBtn.Btn:SetVertexColor(1, 1, 1, 1);
-
-        -- Would the top of the tooltip go off the screen? If so, move the anchor to the top right of the tooltip, and the left side of the info button
-        -- local top =  mainFrame.infoTooltip:GetTop()
-        -- top = top + mainFrame.infoTooltip:GetHeight()
-
-        -- if top > GetScreenHeight() then
-        --     mainFrame.infoTooltip:ClearAllPoints()
-        --     mainFrame.infoTooltip:SetPoint("TOPRIGHT", mainFrame.infoBtn, "TOPLEFT", -9, 0)
-        -- else
-        --     mainFrame.infoTooltip:ClearAllPoints()
-        --     mainFrame.infoTooltip:SetPoint("BOTTOMLEFT", mainFrame.infoBtn, "TOPLEFT", -15, 0)
-        -- end
-
         -- Fade the tooltip in over 0.2 seconds.
         mainFrame.infoTooltip:Show()
         mainFrame.infoTooltip:SetAlpha(0)
@@ -71,8 +62,8 @@ function WGLUIBuilder.CreateMainFrame()
     end)
 
     -- Create an information tooltip to show when the info button is hovered.
-    local tipWidth = 260
-    local tooltipText = "|cFFFFFFFFKey Bindings|r\n- Double left click to equip the item (if it's your loot).\n- Shift + left click to link the item in chat.\n- Right click to dismiss the item.\n- Alt + left click to try and inspect the player.\n- Ctrl + left click to open trade with the person.\n|CFFFFFFFFTips|r\n- Rings and Trinket will compare to your lowest item level one."
+    local tipWidth = 295
+    local tooltipText = "|cFFFFFFFFKey Bindings|r\n   - Double left click to equip the item (if it's your loot).\n   - Shift + left click to link the item in chat.\n   - Right click to dismiss the item.\n   - Alt + left click to try and inspect the player.\n   - Ctrl + left click to open trade with the person.\n   - Middle click to whisper them with the set whissper messsage in options.\n|CFFFFFFFFTips|r\n   - Rings and Trinket will compare to your lowest item level one."
     mainFrame.infoTooltip = CreateFrame("Frame", nil, UIParent)
     mainFrame.infoTooltip:SetSize(tipWidth, 900)
     mainFrame.infoTooltip:SetPoint("TOP", mainFrame, "TOP", 0, -mainFrame:GetHeight() + 16)
@@ -83,9 +74,10 @@ function WGLUIBuilder.CreateMainFrame()
     mainFrame.infoTooltip.Text:SetJustifyV("TOP")
     mainFrame.infoTooltip.Text:SetSpacing(3)
     mainFrame.infoTooltip.Text:SetText(tooltipText)
-    mainFrame.infoTooltip.Text:SetHeight(mainFrame.infoTooltip.Text:GetStringHeight() + 35)
+    --mainFrame.infoTooltip.Text:SetHeight(mainFrame.infoTooltip.Text:GetStringHeight() + 35)
+    mainFrame.infoTooltip.Text:SetHeight(127)
     mainFrame.infoTooltip:SetHeight(mainFrame.infoTooltip.Text:GetHeight())
-    mainFrame.infoTooltip:SetWidth(mainFrame.infoTooltip.Text:GetWidth())
+    mainFrame.infoTooltip:SetWidth(mainFrame.infoTooltip.Text:GetWidth() + 10)
     mainFrame.infoTooltip:Hide()
 
     -- Now rescale the tooltip to fit the text.
@@ -204,6 +196,161 @@ function WGLUIBuilder.CreateMainFrame()
     WGLUIBuilder.DrawSlicedBG(mainFrame.cursorFrame, "SelectionBox", "backdrop", 0)
     WGLUIBuilder.ColorBGSlicedFrame(mainFrame.cursorFrame, "backdrop", 1, 1, 1, 0.25)
 
+    -- Create a pop up window to show the Whisper text entry.
+    mainFrame.WhisperWindow = CreateFrame("Frame", nil, UIParent)
+    mainFrame.WhisperWindow:SetSize(360, 140)
+    mainFrame.WhisperWindow:SetPoint("CENTER", 0, 0)
+    mainFrame.WhisperWindow:SetFrameLevel(10)
+    mainFrame.WhisperWindow:EnableMouse(true)
+    mainFrame.WhisperWindow:Hide()
+
+    -- Draw background and border
+    WGLUIBuilder.DrawSlicedBG(mainFrame.WhisperWindow, "OptionsWindowBG", "backdrop", 6)
+    WGLUIBuilder.ColorBGSlicedFrame(mainFrame.WhisperWindow, "backdrop", 1, 1, 1, 1)
+    mainFrame.WhisperWindow.Border = CreateFrame("Frame", nil, mainFrame.WhisperWindow)
+    mainFrame.WhisperWindow.Border:SetAllPoints()
+    WGLUIBuilder.DrawSlicedBG(mainFrame.WhisperWindow.Border, "EdgedBorder", "border", 6)
+    WGLUIBuilder.ColorBGSlicedFrame(mainFrame.WhisperWindow.Border, "border", 0.7, 0.7, 0.7, 1)
+
+    -- Title text
+    mainFrame.WhisperWindow.Title = mainFrame.WhisperWindow:CreateFontString(nil, "OVERLAY", "WGLFont_Title")
+    mainFrame.WhisperWindow.Title:SetText("Whisper Player Message")
+    mainFrame.WhisperWindow.Title:SetPoint("TOP", mainFrame.WhisperWindow, "TOP", 0, -15)
+
+    -- Set tip text
+    mainFrame.WhisperWindow.Tip = mainFrame.WhisperWindow:CreateFontString(nil, "OVERLAY", "WGLFont_Tooltip")
+    mainFrame.WhisperWindow.Tip:SetText("Set your custom message here. Use %n for the player's name, and %i for the item name.")
+    mainFrame.WhisperWindow.Tip:SetPoint("TOP", mainFrame.WhisperWindow.Title, "BOTTOM", 0, -10)
+
+    -- Create a "Set to default" button
+    mainFrame.WhisperWindow.DefaultBtn = CreateFrame("Button", nil, mainFrame.WhisperWindow, "WGLGeneralButton")
+    mainFrame.WhisperWindow.DefaultBtn:SetPoint("BOTTOMLEFT", mainFrame.WhisperWindow, "BOTTOMLEFT", 18, 18)
+    mainFrame.WhisperWindow.DefaultBtn:SetSize(70, 14)
+    mainFrame.WhisperWindow.DefaultBtn:SetText("Set to Default")
+    mainFrame.WhisperWindow.DefaultBtn:SetScript("OnClick", function(self)
+        mainFrame.WhisperWindow.EditBox:SetText(WGLUIBuilder.WhisperDefaultMessage)
+        PlaySound(856)
+    end)
+
+    -- Create edit box
+    mainFrame.WhisperWindow.EditBox = CreateFrame("EditBox", nil, mainFrame.WhisperWindow, "InputBoxTemplate")
+    mainFrame.WhisperWindow.EditBox:SetWidth(mainFrame.WhisperWindow:GetWidth() - 50)
+    mainFrame.WhisperWindow.EditBox:SetMultiLine(true)
+    mainFrame.WhisperWindow.EditBox:SetMaxLetters(WGLUIBuilder.WhisperMsgMaxChars)
+    mainFrame.WhisperWindow.EditBox:SetAutoFocus(false)
+    mainFrame.WhisperWindow.EditBox:SetPoint("TOP", mainFrame.WhisperWindow.Tip, "BOTTOM", 0, -15)
+    mainFrame.WhisperWindow.EditBox:SetPoint("BOTTOM", mainFrame.WhisperWindow.DefaultBtn, "TOP", 0, 18)
+    mainFrame.WhisperWindow.EditBox:SetFontObject("WGLFont_Item_StatBottomText")
+    mainFrame.WhisperWindow.EditBox:SetText("Message here")
+    mainFrame.WhisperWindow.EditBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    mainFrame.WhisperWindow.EditBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+
+    -- Hide the background and border of the edit box.
+    mainFrame.WhisperWindow.EditBox.Left:Hide()
+    mainFrame.WhisperWindow.EditBox.Middle:Hide()
+    mainFrame.WhisperWindow.EditBox.Right:Hide()
+
+    WGLUIBuilder.DrawSlicedBG(mainFrame.WhisperWindow.EditBox, "OptionsWindowBG", "backdrop", -8)
+    WGLUIBuilder.ColorBGSlicedFrame(mainFrame.WhisperWindow.EditBox, "backdrop", 1, 1, 1, 0.95)
+    WGLUIBuilder.DrawSlicedBG(mainFrame.WhisperWindow.EditBox, "EdgedBorder", "border", -9)
+    WGLUIBuilder.ColorBGSlicedFrame(mainFrame.WhisperWindow.EditBox, "border", 0.3, 0.3, 0.3, 1)
+
+    -- Create some text below the input box showing the number of available characters.
+    local charCount = mainFrame.WhisperWindow.EditBox:CreateFontString(nil, "OVERLAY", "WGLFont_Tooltip")
+    charCount:SetPoint("BOTTOMRIGHT", mainFrame.WhisperWindow.EditBox, "BOTTOMRIGHT",  0, 0)
+    charCount:SetText(WGLUIBuilder.WhisperMsgMaxChars .. " characters remaining")
+
+    -- Update the character count whenever the text changes.
+    mainFrame.WhisperWindow.EditBox:SetScript("OnTextChanged", function(self)
+        WGLUIBuilder.TempWhisperMesage = self:GetText()
+        local remaining = WGLUIBuilder.WhisperMsgMaxChars - self:GetNumLetters()
+        charCount:SetText(remaining .. " characters remaining")
+
+        -- If the remaining is less than 40, color the text a dark red.
+        if remaining < 40 then
+            charCount:SetTextColor(0.7098, 0.2588, 0.2588, 1)
+        else
+            charCount:SetTextColor(0.65, 0.65, 0.65, 1)
+        end
+
+        -- If the text is different than the saved text, change the text color of the ssave button.
+        mainFrame.WhisperWindow.SaveBtn:SetEnabled(WGLUIBuilder.TempWhisperMesage ~= WhoGotLootsSavedData.WhisperMessage)
+    end)
+    WGLUIBuilder.WhisperEditor = mainFrame.WhisperWindow
+
+    -- Create a "Save" button
+    mainFrame.WhisperWindow.SaveBtn = CreateFrame("Button", nil, mainFrame.WhisperWindow.EditBox, "WGLGeneralButton")
+    mainFrame.WhisperWindow.SaveBtn:SetPoint("BOTTOMRIGHT", mainFrame.WhisperWindow, "BOTTOMRIGHT", -18, 18)
+    mainFrame.WhisperWindow.SaveBtn:SetSize(70, 14)
+    mainFrame.WhisperWindow.SaveBtn:SetText("Save")
+    mainFrame.WhisperWindow.SaveBtn:SetScript("OnClick", function(self)
+        if mainFrame.WhisperWindow.SaveBtn:IsEnabled() == false then return end
+        WhoGotLootsSavedData.WhisperMessage = WGLUIBuilder.TempWhisperMesage
+        mainFrame.WhisperWindow:ShowSavedText()
+        mainFrame.WhisperWindow.SaveBtn:SetEnabled(false)
+        WhoLootsOptionsFrame.whisperPreview:SetText(WGLUIBuilder.TempWhisperMesage)
+        PlaySound(856)
+    end)
+    mainFrame.WhisperWindow.SaveBtn:SetEnabled(false)
+
+    -- Create a frame for the saved message text, so we can move it around.
+    mainFrame.WhisperWindow.SavedTextFrame = CreateFrame("Frame", nil, mainFrame.WhisperWindow)
+    mainFrame.WhisperWindow.SavedTextFrame:SetSize(200, 20)
+    mainFrame.WhisperWindow.SavedTextFrame:SetPoint("RIGHT", mainFrame.WhisperWindow.SaveBtn, "LEFT", -4, 0)
+    mainFrame.WhisperWindow.SavedTextFrame:Hide()
+
+    -- Create some text that says "saved" when the message is saved.
+    mainFrame.WhisperWindow.savedText = mainFrame.WhisperWindow:CreateFontString(nil, "OVERLAY", "WGLFont_Checkbox")
+    mainFrame.WhisperWindow.savedText:SetPoint("RIGHT", mainFrame.WhisperWindow.SavedTextFrame, "RIGHT", -9, 0)
+    mainFrame.WhisperWindow.savedText:SetText("Message saved")
+    mainFrame.WhisperWindow.savedText:SetParent(mainFrame.WhisperWindow.SavedTextFrame)
+    mainFrame.WhisperWindow.savedText:SetVertexColor(0.6196, 0.8627, 0.549, 1)
+    mainFrame.WhisperWindow.SavedTextFrame.AnimDelta = 0
+    mainFrame.WhisperWindow.SavedTextFrame.AnimTimer = nil
+    
+    function mainFrame.WhisperWindow:ShowSavedText()
+        -- Make the SavedTextFrame slide from behind the save button, and fade in.
+        self.SavedTextFrame:Show()
+        self.SavedTextFrame.AnimDelta = 0
+    
+        -- Cancel any onupdate scripts that are running.
+        if WhoLootData.MainFrame.WhisperWindow.SavedTextFrame.AnimTimer then
+            self.SavedTextFrame.AnimTimer:Cancel()
+            self.SavedTextFrame.AnimTimer = nil
+        end
+    
+        self.SavedTextFrame:SetScript("OnUpdate", function(self, elapsed)
+            self.AnimDelta = WGLU.Clamp(self.AnimDelta + elapsed * 5, 0, 1)
+            self:SetPoint("RIGHT", WhoLootData.MainFrame.WhisperWindow.SaveBtn, "LEFT", WGLU.LerpFloat(60, -4, math.sin(self.AnimDelta * 1.57)), 0)
+            self:SetAlpha(self.AnimDelta)
+            if self.AnimDelta == 1 then
+                self:SetScript("OnUpdate", nil) -- Stop the slide-in animation
+                -- Delay the fade out by 1 second.
+                WhoLootData.MainFrame.WhisperWindow.SavedTextFrame.AnimTimer = C_Timer.NewTimer(1, function()
+                    self:SetScript("OnUpdate", function(self, elapsed)
+                        self.AnimDelta = WGLU.Clamp(self.AnimDelta - elapsed * 2, 0, 1)
+                        self:SetAlpha(math.sin(self.AnimDelta * 1.57))
+                        if self.AnimDelta == 0 then
+                            self:Hide()
+                            self:SetScript("OnUpdate", nil)
+                            WhoLootData.MainFrame.WhisperWindow.SavedTextFrame.AnimTimer = nil
+                        end
+                    end)
+                end)
+            end
+        end)
+    end
+    
+
+    -- Close Button
+    local tipCloseBtn = CreateFrame("Button", nil, WGLUIBuilder.WhisperEditor, "WGLCloseBtn")
+    tipCloseBtn:SetPoint("TOPRIGHT", WGLUIBuilder.WhisperEditor, "TOPRIGHT", -12, -12)
+    tipCloseBtn:SetSize(12, 12)
+    tipCloseBtn:SetScript("OnClick", function(self)
+        PlaySound(856)
+        WGLUIBuilder.WhisperEditor:Hide()
+    end)
+
     return mainFrame
 end
 
@@ -237,7 +384,23 @@ FrameTextures =
         file = "SelectionBox",
         cornerSize = 14,
         cornerCoord = 0.25,
-    }
+    },
+
+    ItemEntryGlow = {
+        file = "ItemBox_Upgrade",
+        cornerSize = 8,
+        cornerCoord = 0.2,
+    },
+    BtnBG = {
+        file = "ItemBG",
+        cornerSize = 4,
+        cornerCoord = 0.2,
+    },
+    BtnBorder = {
+        file = "EdgedBorder_Sharp_Thick",
+        cornerSize = 4,
+        cornerCoord = 0.2,
+    },
 }
 
 
@@ -317,7 +480,7 @@ function WGLUIBuilder.DrawSlicedBG(frame, textureKey, layer, shrink)
                 tex:SetPoint("CENTER", frame, "BOTTOMRIGHT", -shrink, shrink);
                 tex:SetTexCoord(1-coord, 1, 1-coord, 1);
             end
-    end
+        end
     end
 end
 
