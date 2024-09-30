@@ -40,19 +40,16 @@ function WGLUIBuilder.CreateMainFrame()
         mainFrame.infoBtn.Btn:SetVertexColor(1, 1, 1, 1);
 
         -- Would the top of the tooltip go off the screen? If so, move the anchor to the top right of the tooltip, and the left side of the info button
-        local top =  mainFrame.infoTooltip:GetTop()
-        top = top + mainFrame.infoTooltip:GetHeight()
+        -- local top =  mainFrame.infoTooltip:GetTop()
+        -- top = top + mainFrame.infoTooltip:GetHeight()
 
-        -- Take the scale into account
-        top = top * mainFrame.infoTooltip:GetScale()
-
-        if top > GetScreenHeight() then
-            mainFrame.infoTooltip:ClearAllPoints()
-            mainFrame.infoTooltip:SetPoint("TOPRIGHT", mainFrame.infoBtn, "TOPLEFT", -9, 0)
-        else
-            mainFrame.infoTooltip:ClearAllPoints()
-            mainFrame.infoTooltip:SetPoint("BOTTOMLEFT", mainFrame.infoBtn, "TOPLEFT", -15, 0)
-        end
+        -- if top > GetScreenHeight() then
+        --     mainFrame.infoTooltip:ClearAllPoints()
+        --     mainFrame.infoTooltip:SetPoint("TOPRIGHT", mainFrame.infoBtn, "TOPLEFT", -9, 0)
+        -- else
+        --     mainFrame.infoTooltip:ClearAllPoints()
+        --     mainFrame.infoTooltip:SetPoint("BOTTOMLEFT", mainFrame.infoBtn, "TOPLEFT", -15, 0)
+        -- end
 
         -- Fade the tooltip in over 0.2 seconds.
         mainFrame.infoTooltip:Show()
@@ -74,18 +71,26 @@ function WGLUIBuilder.CreateMainFrame()
     end)
 
     -- Create an information tooltip to show when the info button is hovered.
+    local tipWidth = 260
+    local tooltipText = "|cFFFFFFFFKey Bindings|r\n- Double left click to equip the item (if it's your loot).\n- Shift + left click to link the item in chat.\n- Right click to dismiss the item.\n- Alt + left click to try and inspect the player.\n- Ctrl + left click to open trade with the person.\n|CFFFFFFFFTips|r\n- Rings and Trinket will compare to your lowest item level one."
     mainFrame.infoTooltip = CreateFrame("Frame", nil, UIParent)
-    mainFrame.infoTooltip:SetSize(270, 135)
-    mainFrame.infoTooltip:SetPoint("BOTTOMLEFT", mainFrame.infoBtn, "TOPLEFT", -15, 0)
-    mainFrame.infoTooltip:SetFrameLevel(4)
+    mainFrame.infoTooltip:SetSize(tipWidth, 900)
+    mainFrame.infoTooltip:SetPoint("TOP", mainFrame, "TOP", 0, -mainFrame:GetHeight() + 16)
+    mainFrame.infoTooltip:SetFrameLevel(mainFrame:GetFrameLevel() + 10)
     mainFrame.infoTooltip.Text = mainFrame.infoTooltip:CreateFontString(nil, "OVERLAY", "WGLFont_Tooltip")
-    mainFrame.infoTooltip.Text:SetAllPoints()
-    mainFrame.infoTooltip.Text:SetPoint("TOPLEFT", mainFrame.infoTooltip, "TOPLEFT", 15, -0)
-    mainFrame.infoTooltip.Text:SetText("|cFFFFFFFFKey Bindings|r\n- Double left click to equip the item (if it's your loot).\n- Shift + left click to link the item in chat.\n- Right click to dismiss the item.\n- Alt + left click to try and inspect the player.\n- Ctrl + left click to open trade with the person.\n|CFFFFFFFFTips|r\n- Rings and Trinket will compare to your lowest item level one.")
+    mainFrame.infoTooltip.Text:SetSize(tipWidth, 999)
     mainFrame.infoTooltip.Text:SetJustifyH("LEFT")
-    mainFrame.infoTooltip.Text:SetSpacing(4)
-    mainFrame.infoTooltip:SetScale(1.4)
+    mainFrame.infoTooltip.Text:SetJustifyV("TOP")
+    mainFrame.infoTooltip.Text:SetSpacing(3)
+    mainFrame.infoTooltip.Text:SetText(tooltipText)
+    mainFrame.infoTooltip.Text:SetHeight(mainFrame.infoTooltip.Text:GetStringHeight() + 35)
+    mainFrame.infoTooltip:SetHeight(mainFrame.infoTooltip.Text:GetHeight())
+    mainFrame.infoTooltip:SetWidth(mainFrame.infoTooltip.Text:GetWidth())
     mainFrame.infoTooltip:Hide()
+
+    -- Now rescale the tooltip to fit the text.
+    mainFrame.infoTooltip.Text:SetPoint("TOPLEFT", mainFrame.infoTooltip, "TOPLEFT", 15, -15)
+    mainFrame.infoTooltip.Text:SetPoint("BOTTOMRIGHT", mainFrame.infoTooltip, "BOTTOMRIGHT", -15, 15)
 
     -- Draw background and border
     WGLUIBuilder.DrawSlicedBG(mainFrame.infoTooltip, "OptionsWindowBG", "backdrop", 6)
@@ -218,14 +223,14 @@ FrameTextures =
 
     ItemEntryBG = {
         file = "ItemBG",
-        cornerSize = 8,
-        cornerCoord = 0.25,
+        cornerSize = 10,
+        cornerCoord = 0.2,
     },
 
     ItemEntryBorder = {
-        file = "EdgedBorder",
-        cornerSize = 8,
-        cornerCoord = 0.25,
+        file = "EdgedBorder_Sharp",
+        cornerSize = 10,
+        cornerCoord = 0.2,
     },
 
     SelectionBox = {
@@ -319,18 +324,16 @@ end
 function WGLUIBuilder.ColorBGSlicedFrame(frame, layer, r, g, b, a)
 
     if layer == "backdrop" then
-        if not frame.backdropTextures then
-            return
-        end
-        for _, tex in pairs(frame.backdropTextures) do
-            tex:SetVertexColor(r, g, b, a);
+        if frame.backdropTextures then
+            for _, tex in pairs(frame.backdropTextures) do
+                tex:SetVertexColor(r, g, b, a);
+            end
         end
     elseif layer == "border" then
-        if not frame.borderTextures then
-            return
-        end
-        for _, tex in pairs(frame.borderTextures) do
-            tex:SetVertexColor(r, g, b, a);
+        if frame.borderTextures then
+            for _, tex in pairs(frame.borderTextures) do
+                tex:SetVertexColor(r, g, b, a);
+            end
         end
     end
 end

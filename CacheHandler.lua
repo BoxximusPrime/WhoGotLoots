@@ -88,26 +88,26 @@ function WGLCache.RemoveRequest(ID)
     end
 end
 
+local function GetLowestItemLink(unitName, slot1, slot2)
+    local itemLink1 = GetInventoryItemLink(unitName, slot1)
+    local itemLink2 = GetInventoryItemLink(unitName, slot2)
+
+    if itemLink1 and itemLink2 then
+        local itemLevel1 = C_Item.GetDetailedItemLevelInfo(itemLink1)
+        local itemLevel2 = C_Item.GetDetailedItemLevelInfo(itemLink2)
+        return itemLevel1 < itemLevel2 and itemLink1 or itemLink2
+    end
+    return nil
+end
+
+local function SetText(request, text)
+    if not request.Frame then return end
+    request.Frame.LoadingIcon:FadeOut()
+    request.Frame.BottomText2:SetText(text)
+end
+
 local function HandleInspections(fromTimer)
     local keysToRemove = {}
-
-    local function GetLowestItemLink(unitName, slot1, slot2)
-        local itemLink1 = GetInventoryItemLink(unitName, slot1)
-        local itemLink2 = GetInventoryItemLink(unitName, slot2)
-
-        if itemLink1 and itemLink2 then
-            local itemLevel1 = C_Item.GetDetailedItemLevelInfo(itemLink1)
-            local itemLevel2 = C_Item.GetDetailedItemLevelInfo(itemLink2)
-            return itemLevel1 < itemLevel2 and itemLink1 or itemLink2
-        end
-        return nil
-    end
-
-    local function SetText(request, text)
-        if not request.Frame then return end
-        request.Frame.LoadingIcon:FadeOut()
-        request.Frame.BottomText2:SetText(text)
-    end
 
     for ID, request in pairs(WGL_Request_Cache) do
         if request.QueryStage == WGLCacheCacheStage.Sent then
@@ -137,12 +137,12 @@ local function HandleInspections(fromTimer)
                     local playerName = select(6, GetPlayerInfoByGUID(request.PlayerGUID))
 
                     if itemLevel < request.ItemLevel then
-                        request.Frame.BottomText2:SetText("|cFFe28743+" .. request.ItemLevel - itemLevel .. " ilvl upgrade for " .. playerName .. "|r")
+                        request.Frame.BottomText2:SetText("|cFFFFFFFFThem: |cFFe28743+" .. request.ItemLevel - itemLevel .. " ilvl upgrade for " .. playerName .. "|r")
                     else
                         if request.GoodForPlayer then
-                            request.Frame.BottomText2:SetText("Them: |cFF00FF00[Tradeable]|r " .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
+                            request.Frame.BottomText2:SetText("|cFFFFFFFFThem:|r |cFFb7d672" .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
                         else
-                            request.Frame.BottomText2:SetText("Them: " .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
+                            request.Frame.BottomText2:SetText("|cFFFFFFFFThem:|r " .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
                         end
                     end
                     if request.TextString ~= "" then
@@ -152,14 +152,16 @@ local function HandleInspections(fromTimer)
                     request.Frame.LoadingIcon:FadeOut()
                     UpdateQueueDebugList()
                 end
-            else
-                if not request.UnitName and request.QueryStage == WGLCacheCacheStage.Finished then
-                    SetText("Couldn't find player")
-                end
+            end
 
-                if request.UnitName and request.QueryStage == WGLCacheCacheStage.Finished then
-                    SetText("Inspect timed out")
-                end
+            if not request.UnitName and request.QueryStage == WGLCacheCacheStage.Finished then
+                table.insert(keysToRemove, ID)
+                SetText("Couldn't find player")
+            end
+
+            if request.UnitName and request.QueryStage == WGLCacheCacheStage.Finished then
+                table.insert(keysToRemove, ID)
+                SetText("Inspect timed out")
             end
 
             -- If we've been waiting for a while, then we'll retry the inspect.
@@ -219,7 +221,7 @@ function UpdateQueueDebugList()
     for ID, request in pairs(WGL_Request_Cache) do
         if not WGL_Request_Debug_Cache[ID] then
             WGL_Request_Debug_Cache[ID] = {
-                UnitName = UnitName(request.UnitName),
+                UnitName = UnitName(request.UnitName) or "Unknown",
                 ItemLocation = request.ItemLocation,
                 ItemLevel = request.ItemLevel,
                 QueryStage = request.QueryStage,

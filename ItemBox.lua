@@ -1,22 +1,23 @@
 WhoGotLootsFrames = {}
 WGL_FrameManager = {}
 WhoLootFrameData = {}
+WhoLootData = WhoLootData or {}
 
 WGL_NumPooledFrames = 10
 
 -- Animation Values
 WhoLootFrameData.HoverAnimTime = 0.3
-WhoLootFrameData.IconStartLeftPos = 55
-WhoLootFrameData.ItemNameStartLeftPos = 85
-WhoLootFrameData.BottomTextStartLeftPos = 85
 
-WhoLootFrameData.IconEndLeftPos = -30
-WhoLootFrameData.ItemNameEndLeftPos = 5
-WhoLootFrameData.BottomTextEndLeftPos = 5
+-- Animation values { start, end }
+WhoLootFrameData.ItemNameAnimPosLeft = { 35, 5 }
+WhoLootFrameData.BottomTextAnimPosLeft = { 35, 5 }
+WhoLootFrameData.IconAnimPosLeft = { 8, 7 }
+WhoLootFrameData.PlayerNameLeft = { 8, 5 }
 
-WhoLootFrameData.IconTopPos = -5
-WhoLootFrameData.ItemNameTopPos = -5
-WhoLootFrameData.BottomTextTopPos = -8
+WhoLootFrameData.ItemNameAnimPosTop = { -5, -5 }
+WhoLootFrameData.BottomTextAnimPosTop = { -17, -17 }
+WhoLootFrameData.IconAnimPosTop = { -15, -15 }
+WhoLootFrameData.PlayerNameTop = { -5.5, -5.5    }
 
 WhoLootFrameData.FrameLifetime = 60
 
@@ -27,11 +28,10 @@ WhoLootFrameData.ExitColor = { 0.1, 0.1, 0.1, 1 }
 function WGL_FrameManager:CreateFrame()
 
     -- Create a new frame to display the player and item.
-    local ItemFrame = CreateFrame("Frame", nil, nil)
+    local ItemFrame = CreateFrame("Frame", nil, WhoLootData.MainFrame)
     ItemFrame:SetWidth(250)
-    ItemFrame:SetHeight(43)
+    ItemFrame:SetHeight(48)
     ItemFrame:SetClipsChildren(true)
-    ItemFrame:SetFrameLevel(5)
     WhoGotLootsFrames[#WhoGotLootsFrames + 1] = ItemFrame
 
     -- Create a few variables we'll need later.
@@ -53,34 +53,45 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.border:SetAllPoints();
     ItemFrame.border:SetFrameLevel(ItemFrame:GetFrameLevel() + 1);
     WGLUIBuilder.DrawSlicedBG(ItemFrame.border, "ItemEntryBorder", "border", 0)
-    WGLUIBuilder.ColorBGSlicedFrame(ItemFrame.border, "border", 0.4, 0.4, 0.4, 1)
+    WGLUIBuilder.ColorBGSlicedFrame(ItemFrame.border, "border", 0.5, 0.5, 0.5, 1)
+
+    -- Show the item's icon.
+    ItemFrame.Icon = ItemFrame:CreateTexture(nil, "OVERLAY", nil, 7)
+    ItemFrame.Icon:SetSize(22, 22)
+    ItemFrame.Icon:SetPoint("TOPLEFT", 5, -ItemFrame:GetHeight() / 2 + ItemFrame.Icon:GetHeight() / 2)
+    ItemFrame.Icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
 
     -- Create a text showing which player it was.
-    ItemFrame.PlayerText = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_Item_StatBottomText")
-    ItemFrame.PlayerText:SetPoint("LEFT", 10, 0)
-    ItemFrame.PlayerText:SetParent(ItemFrame)
+    -- First, create a new frame to hold the text.
+    ItemFrame.PlayerTextFrame = CreateFrame("Frame", nil, ItemFrame)
+    ItemFrame.PlayerTextFrame:SetSize(100, 12)
+    ItemFrame.PlayerTextFrame:SetPoint("TOPLEFT", ItemFrame, "TOPLEFT", WhoLootFrameData.PlayerNameLeft[1], WhoLootFrameData.PlayerNameTop[1])
+    ItemFrame.PlayerTextFrame:SetFrameLevel(ItemFrame:GetFrameLevel() + 1)
+
+    ItemFrame.PlayerText = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_ItemName")
+    ItemFrame.PlayerText:SetParent(ItemFrame.PlayerTextFrame)
+    ItemFrame.PlayerText:SetPoint("TOPLEFT", 0, 0)
     ItemFrame.PlayerText:SetText("PlayerName")
-    ItemFrame.PlayerText:SetWidth(43)
     ItemFrame.PlayerText:SetWordWrap(false)
     ItemFrame.PlayerText:SetJustifyH("LEFT")
 
+    -- Create a little texture that'll sit to the right of the player name (will be an arrow pointing right)
+    ItemFrame.PlayerArrow = ItemFrame:CreateTexture(nil, "OVERLAY")
+    ItemFrame.PlayerArrow:SetSize(8, 8)
+    ItemFrame.PlayerArrow:SetPoint("LEFT", ItemFrame.PlayerText, "RIGHT", 2, 0)
+    ItemFrame.PlayerArrow:SetTexture("Interface\\Addons\\WhoGotLoots\\Art\\RightArrow")
+    ItemFrame.PlayerArrow:SetVertexColor(0.6, 0.6, 0.6, 1)
+
     -- Create a progress bar that will show the timer's progress.
     ItemFrame.ProgressBar = CreateFrame("StatusBar", nil, ItemFrame)
-    ItemFrame.ProgressBar:SetSize(100, 2)
-    ItemFrame.ProgressBar:SetPoint("BOTTOMLEFT",  1, 1)
-    ItemFrame.ProgressBar:SetPoint("BOTTOMRIGHT", -1, 1)
+    ItemFrame.ProgressBar:SetSize(100, 3)
+    ItemFrame.ProgressBar:SetPoint("BOTTOMLEFT",  1, 2)
+    ItemFrame.ProgressBar:SetPoint("BOTTOMRIGHT", -1, 2)
     ItemFrame.ProgressBar:SetMinMaxValues(0, 1)
     ItemFrame.ProgressBar:SetValue(0)
     ItemFrame.ProgressBar:SetStatusBarTexture("Interface\\Buttons\\WHITE8x8")
     ItemFrame.ProgressBar:SetStatusBarColor(0.5, 0.5, 0.5, 0.6)
     ItemFrame.ProgressBar:SetParent(ItemFrame)
-
-    -- Show the item's icon.
-    ItemFrame.Icon = ItemFrame:CreateTexture(nil, "OVERLAY")
-    ItemFrame.Icon:SetSize(22, 22)
-    ItemFrame.Icon:SetPoint("TOPLEFT", 55, -5)
-    ItemFrame.Icon:SetParent(ItemFrame)
-    ItemFrame.Icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
 
     -- Create a loading icon over the item icon.
     ItemFrame.LoadingIcon = CreateFrame("Frame", nil, ItemFrame, "LoadingIcon")
@@ -98,7 +109,11 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.BottomText:SetPoint("TOPLEFT", nil, "BOTTOMLEFT", 0, -4)
     ItemFrame.BottomText:SetParent(ItemFrame)
     ItemFrame.BottomText:SetText("Bottom Text")
+    ItemFrame.BottomText:SetJustifyH("LEFT")
     ItemFrame.BottomText:SetJustifyV("TOP")
+    ItemFrame.BottomText:SetWordWrap(true)
+    ItemFrame.BottomText:SetNonSpaceWrap(false)
+    ItemFrame.BottomText:SetWidth(ItemFrame:GetWidth() - WhoLootFrameData.BottomTextAnimPosLeft[1] - 8)
 
     ItemFrame.BottomText2 = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_Item_StatBottomText")
     ItemFrame.BottomText2:SetPoint("TOPLEFT", ItemFrame.BottomText, "BOTTOMLEFT", 0, 0)
@@ -108,37 +123,8 @@ function WGL_FrameManager:CreateFrame()
     -- Create a close button to remove the frame.
     ItemFrame.Close = CreateFrame("Button", nil, ItemFrame, "WGLCloseBtn")
     ItemFrame.Close:SetSize(12, 12)
-    ItemFrame.Close:SetPoint("TOPRIGHT", -6, -6)
+    ItemFrame.Close:SetPoint("TOPRIGHT", -4, -4)
     ItemFrame.Close.ParentFrame = ItemFrame
-
-    ItemFrame.HintContainer = CreateFrame("Frame", nil, ItemFrame)
-    ItemFrame.HintContainer:SetSize(100, 12)
-    ItemFrame.HintContainer:SetPoint("TOPRIGHT", ItemFrame.Close, "LEFT", -4, 0)
-    ItemFrame.HintContainer:SetFrameLevel(ItemFrame:GetFrameLevel() + 1)
-    ItemFrame.HintContainer:SetAlpha(0)
-
-    -- Show the left and right click icons to the left of the close button
-    ItemFrame.RightClickIcon = ItemFrame:CreateTexture(nil, "OVERLAY")
-    ItemFrame.RightClickIcon:SetSize(8, 8)
-    ItemFrame.RightClickIcon:SetPoint("RIGHT", ItemFrame.Close, "LEFT", -4, 0)
-    ItemFrame.RightClickIcon:SetTexture("Interface\\Addons\\WhoGotLoots\\Art\\RightClick")
-    ItemFrame.RightClickIcon:SetVertexColor(1, 1, 1, 1)
-    ItemFrame.RightClickIcon:SetParent(ItemFrame.HintContainer)
-
-    -- Show "shift" text and left click icon to the left of the right click icon
-    ItemFrame.LeftClickIcon = ItemFrame:CreateTexture(nil, "OVERLAY")
-    ItemFrame.LeftClickIcon:SetSize(8, 8)
-    ItemFrame.LeftClickIcon:SetPoint("RIGHT", ItemFrame.RightClickIcon, "LEFT", -4, 0)
-    ItemFrame.LeftClickIcon:SetTexture("Interface\\Addons\\WhoGotLoots\\Art\\LeftClick")
-    -- ItemFrame.LeftClickIcon:SetVertexColor(0.2, 0.1, 0.8, 1)
-    ItemFrame.LeftClickIcon:SetParent(ItemFrame.HintContainer)
-
-    ItemFrame.ShiftText = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_VersNum")
-    ItemFrame.ShiftText:SetPoint("RIGHT", ItemFrame.LeftClickIcon, "LEFT", 0, 0)
-    ItemFrame.ShiftText:SetText("Shift + ")
-    ItemFrame.ShiftText:SetParent(ItemFrame.HintContainer)
-    ItemFrame.ShiftText:SetTextColor(0.8, 0.8, 0.8, 1)
-
 
     -- Add the frame to the list of frames.
     WhoGotLootsFrames[#WhoGotLootsFrames + 1] = ItemFrame
@@ -168,17 +154,11 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.Close:SetScript("OnLeave", function(self) self.Btn:SetVertexColor(0.7, 0.7, 0.7, 1); WhoLootData.HoverFrame(ItemFrame, false); end)
 
     function ItemFrame:HoverOver()
-        if WhoGotLootsSavedData.ShowControlHints then
-            -- Fade the ItemFrame.HintContainer in over 0.2 seconds
-            self.HintContainer:SetAlpha(0)
-            self.HintContainer:Show()
-            self.HintContainer:SetScript("OnUpdate", function(self, elapsed)
-                self:SetAlpha(WGLU.Clamp(self:GetAlpha() + elapsed * 5, 0, 1))
-                if self:GetAlpha() >= 1 then
-                    self:SetScript("OnUpdate", nil)
-                end
-            end)
-        end
+
+    end
+
+    function ItemFrame:HoverOut()
+
     end
 
     function ItemFrame.LoadingIcon:Unhide()
@@ -199,27 +179,14 @@ function WGL_FrameManager:CreateFrame()
         end)
     end
 
-    function ItemFrame:HoverOut()
-        -- Fade the ItemFrame.HintContainer out over 0.2 seconds
-        self.HintContainer:SetScript("OnUpdate", function(self, elapsed)
-            self:SetAlpha(WGLU.Clamp(self:GetAlpha() - elapsed * 5, 0, 1))
-            if self:GetAlpha() <= 0 then
-                self:Hide()
-                self:SetScript("OnUpdate", nil)
-            end
-        end)
-    end
-
     -- Animation/visual controls
     function ItemFrame:Reset()
         self:SetAlpha(1)
         self.Icon:ClearAllPoints()
-        self.Icon:SetPoint("TOPLEFT", WhoLootFrameData.IconStartLeftPos, WhoLootFrameData.IconTopPos)
+        self.Icon:SetPoint("TOPLEFT", WhoLootFrameData.IconAnimPosLeft[1], WhoLootFrameData.IconAnimPosTop[1])
         self.Icon:SetAlpha(1)
-        self.ItemText:ClearAllPoints()
-        self.ItemText:SetPoint("TOPLEFT", WhoLootFrameData.ItemNameStartLeftPos, WhoLootFrameData.ItemNameTopPos)
         self.BottomText:ClearAllPoints()
-        self.BottomText:SetPoint("TOPLEFT", ItemFrame.ItemText, "BOTTOMLEFT", 0, -4)
+        self.BottomText:SetPoint("TOPLEFT", WhoLootFrameData.BottomTextAnimPosLeft[1], WhoLootFrameData.BottomTextAnimPosTop[1])
         self.BottomText2:ClearAllPoints()
         self.BottomText2:SetPoint("TOPLEFT", ItemFrame.BottomText, "BOTTOMLEFT", 0, -2)
         self.Animating = false

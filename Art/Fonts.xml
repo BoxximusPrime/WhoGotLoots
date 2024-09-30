@@ -16,7 +16,7 @@
         <Color r="0.3" g="0.3" b="0.3"/>
     </font>
 
-    <font name="WGLFont_Item_StatBottomText" font="Interface\Addons\WhoGotLoots\Fonts\OpenSans-Bold.ttf" height="7" virtual="true">
+    <font name="WGLFont_Item_StatBottomText" font="Interface\Addons\WhoGotLoots\Fonts\hk-grotesk.bold.ttf" height="8" virtual="true">
         <Color r="0.66" g="0.66" b="0.66"/>
     </font>
 
@@ -24,7 +24,7 @@
         <Color r="0.3" g="0.3" b="0.3"/>
     </font>
 
-    <font name="WGLFont_Tooltip" font="Interface\Addons\WhoGOtLoots\Fonts\OpenSans-Semibold.ttf" height="9" virtual="true">
+    <font name="WGLFont_Tooltip" font="Interface\Addons\WhoGOtLoots\Fonts\hk-grotesk.medium.ttf" height="8" virtual="true">
         <Color r="0.65" g="0.65" b="0.65"/>
     </font>
     

@@ -24,7 +24,6 @@ function WhoLootsOptionsEntries.LoadOptions()
     if WhoGotLootsSavedData.ShowOwnLoot == nil then WhoGotLootsSavedData.ShowOwnLoot = true end
     if WhoGotLootsSavedData.ShowDuringRaid == nil then WhoGotLootsSavedData.ShowDuringRaid = true end
     if WhoGotLootsSavedData.ShowDuringLFR == nil then WhoGotLootsSavedData.ShowDuringLFR = false end
-    if WhoGotLootsSavedData.ShowControlHints == nil then WhoGotLootsSavedData.ShowControlHints = true end
     if WhoGotLootsSavedData.MinQuality == nil then WhoGotLootsSavedData.MinQuality = 3 end
 
     WhoLootsOptionsEntries.AutoClose:SetChecked(WhoGotLootsSavedData.AutoCloseOnEmpty)
@@ -35,7 +34,6 @@ function WhoLootsOptionsEntries.LoadOptions()
     WhoLootsOptionsEntries.ScaleSlider:SetValue(WhoGotLootsSavedData.SavedSize)
     WhoLootsOptionsEntries.ShowDuringRaid:SetChecked(WhoGotLootsSavedData.ShowDuringRaid)
     WhoLootsOptionsEntries.ShowDuringLFR:SetChecked(WhoGotLootsSavedData.ShowDuringLFR)
-    WhoLootsOptionsEntries.ControlHints:SetChecked(WhoGotLootsSavedData.ShowControlHints)
     WhoLootsOptionsEntries.MinQualitySlider:SetValue(WhoGotLootsSavedData.MinQuality)
 
     -- Set the minimum item quality text color
@@ -246,23 +244,9 @@ soundToggle_Desc:SetPoint("TOPLEFT", SoundToggle, "BOTTOMLEFT", 15, -8)
 soundToggle_Desc:SetText("Enable the looting sound effect.")
 soundToggle_Desc:SetParent(contentFrame)
 
--- Show control hints
-local controlHints = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
-WGLUIBuilder.AddOnClick(controlHints, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowControlHints = tick; end)
-controlHints.Label:SetText("Show Control Hints")
-controlHints:SetPoint("TOPLEFT", soundToggle_Desc, "BOTTOMLEFT", -15, -16)
-controlHints:SetParent(contentFrame)
-WhoLootsOptionsEntries.ControlHints = controlHints
--- Option text
-local controlHints_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
-controlHints_Desc:SetPoint("TOPLEFT", controlHints, "BOTTOMLEFT", 15, -8)
-controlHints_Desc:SetText("Show control hints in the window.")
-controlHints_Desc:SetParent(contentFrame)
-
-
 -- Scale Slider Title
 local scaleSlider_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_Checkbox")
-scaleSlider_Desc:SetPoint("TOPLEFT", controlHints_Desc, "BOTTOMLEFT", -10, -20)
+scaleSlider_Desc:SetPoint("TOPLEFT", soundToggle_Desc, "BOTTOMLEFT", -10, -20)
 scaleSlider_Desc:SetText("Adjust the scale of the window.")
 scaleSlider_Desc:SetParent(contentFrame)
 
@@ -292,6 +276,7 @@ scaleSlider:SetScript("OnMouseUp", function(self, button)
     local value = self:GetValue()
     WhoGotLootsSavedData.SavedSize = value
     WhoLootData.MainFrame:SetScale(value)
+    WhoLootData.MainFrame.infoTooltip:SetScale(value)
     WhoLootData.MainFrame.cursorFrame:SetScale(value)
 end)
 WhoLootsOptionsEntries.ScaleSlider = scaleSlider

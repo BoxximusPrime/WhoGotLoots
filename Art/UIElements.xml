@@ -255,12 +255,12 @@
 				</Texture>
 			</Layer>
 			<Layer level="OVERLAY">
-				<FontString parentKey="KeyLabel" inherits="WGLFont_General" text="0" hidden="false" ignoreParentScale="true" justifyH="CENTER" justifyV="TOP">
+				<FontString parentKey="KeyLabel" inherits="WGLFont_General" text="0" hidden="false" ignoreParentScale="false" justifyH="CENTER" justifyV="TOP">
 					<Anchors>
 						<Anchor point="TOP" relativeKey="$parent.VirtualThumb" relativePoint="BOTTOM" x="0" y="-4"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="KeyLabel2" inherits="WGLFont_General" text="0" hidden="true" ignoreParentScale="true" justifyH="LEFT" justifyV="MIDDLE">
+				<FontString parentKey="KeyLabel2" inherits="WGLFont_General" text="0" hidden="true" ignoreParentScale="false" justifyH="LEFT" justifyV="MIDDLE">
 					<Anchors>
 						<Anchor point="LEFT" relativeKey="$parent" relativePoint="RIGHT" x="6" y="0"/>
 					</Anchors>

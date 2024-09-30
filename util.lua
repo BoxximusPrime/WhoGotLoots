@@ -72,6 +72,7 @@ function WGLU.SimplifyStatName(statName)
   elseif statName == "Leech" then return "Leech"
   elseif statName == "Speed" then return "Speed"
   elseif statName == "Indestructible" then return "Indest"
+  elseif statName == "Armor" then return "Armor"
   else return nil end
 end
 
