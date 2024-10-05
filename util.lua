@@ -153,6 +153,12 @@ end
 -- mainstat is a string, either "agility", "strength", or "intellect"
 function WGLU.ItemHasMainStat(itemLink, mainStat)
 
+  -- If the item is a neck, ring, or trinket, it doesn't have a main stat.
+  local itemType = select(9, C_Item.GetItemInfo(itemLink))
+  if itemType == "INVTYPE_NECK" or itemType == "INVTYPE_FINGER" or itemType == "INVTYPE_TRINKET" then
+    return true
+  end
+
   local stats = C_Item.GetItemStats(itemLink)
   if not stats then return false end
 

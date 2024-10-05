@@ -12,8 +12,8 @@ function WGLItemsDB.IsAppropriate(item, class)
     class = class or playerclass
     local slot, _, itemclass, itemsubclass = select(4, C_Item.GetItemInfoInstant(item))
 
-    -- Cloaks are cloth, technically. But everyone can wear them.
-    if slot == 'INVTYPE_CLOAK' then return true end
+    -- If it's a cloak, ring, trinket, or neck, it's always appropriate.
+    if slot == 'INVTYPE_CLOAK' or slot == "INVTYPE_NECK" or slot == "INVTYPE_FINGER" or slot == "INVTYPE_TRINKET" then return true end
 
     if not (class and ClassAndGearDB[class] and itemclass and itemsubclass) then
         return

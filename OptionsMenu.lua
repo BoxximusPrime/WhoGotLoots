@@ -20,7 +20,7 @@ function WhoLootsOptionsEntries.LoadOptions()
     -- Set the initial values of the options
     if WhoGotLootsSavedData.AutoCloseOnEmpty == nil then WhoGotLootsSavedData.AutoCloseOnEmpty = true end
     if WhoGotLootsSavedData.LockWindow == nil then WhoGotLootsSavedData.LockWindow = false end
-    if WhoGotLootsSavedData.HideUnequippable == nil then WhoGotLootsSavedData.HideUnequippable = true end
+    if WhoGotLootsSavedData.HideUnequippable == nil then WhoGotLootsSavedData.HideUnequippable = false end
     if WhoGotLootsSavedData.SavedSize == nil then WhoGotLootsSavedData.SavedSize = 1 end
     if WhoGotLootsSavedData.SoundEnabled == nil then WhoGotLootsSavedData.SoundEnabled = true end
     if WhoGotLootsSavedData.ShowOwnLoot == nil then WhoGotLootsSavedData.ShowOwnLoot = true end
