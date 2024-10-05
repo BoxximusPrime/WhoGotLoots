@@ -1,6 +1,6 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-WhoLootDataVers = "1.4.0"
+WhoLootDataVers = "1.4.2"
 WGLU.DebugMode = false
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
@@ -191,7 +191,7 @@ function AddLootFrame(player, CompareItemLink)
         local ItemHasMainStat = WGLU.ItemHasMainStat(CompareItemLink, PlayerTopStat)
 
         -- If we don't want to show unequippable items, and this item is not equippable, return.
-        if WhoGotLootsSavedData.HideUnequippable == true and (CanEquip == false or IsAppropriate == false or ItemHasMainStat == false) then return end
+        if WhoGotLootsSavedData.HideUnequippable == true and not UnitIsUnit('player', player) and (CanEquip == false or IsAppropriate == false or ItemHasMainStat == false) then return end
         
         -- Get currently equipped item information
         local CurrentSlotID = -1
@@ -591,14 +591,12 @@ function WhoLootData.SetupItemBoxFunctions(frame, itemLink, player)
             end
         end
         if button == "MiddleButton" then
-            -- Whisper the player
-            if player == "player" then player = UnitName("player") end
-            
-            local messsage = WhoGotLootsSavedData.WhisperMessage
-            messsage = messsage:gsub("%%n", player)
-            messsage = messsage:gsub("%%i", itemLink)
+            local message = WhoGotLootsSavedData.WhisperMessage
+            local playerName = select(1, UnitName(player))
+            message = message:gsub("%%n", playerName)
+            message = message:gsub("%%i", itemLink)
 
-            SendChatMessage(messsage, "WHISPER", nil, UnitName(player))
+            SendChatMessage(message, "WHISPER", nil, UnitName(player))
         end
         if button == "RightButton" then
             WGLCache.RemoveRequest(frame.QueuedRequest)

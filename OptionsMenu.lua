@@ -12,6 +12,8 @@ WhoLootsOptionsFrame:ClearAllPoints()
 WhoLootsOptionsFrame:SetPoint("TOPLEFT", WhoLootData.MainFrame, "TOPRIGHT", 0, 0)
 WhoLootsOptionsFrame:EnableMouse(true)
 
+WGLUIBuilder = WGLUIBuilder or {}
+
 -- Handle Events --
 function WhoLootsOptionsEntries.LoadOptions()
 
@@ -40,9 +42,9 @@ function WhoLootsOptionsEntries.LoadOptions()
         WhoLootsOptionsFrame.whisperPreview:SetText(WhoGotLootsSavedData.WhisperMessage)
         WGLUIBuilder.WhisperEditor.EditBox:SetText(WhoGotLootsSavedData.WhisperMessage)
     else
+        WhoGotLootsSavedData.WhisperMessage = WGLUIBuilder.DefaultWhisperMessage
         WGLUIBuilder.WhisperEditor.EditBox:SetText(WGLUIBuilder.DefaultWhisperMessage)
     end
-    
 
     -- Set the minimum item quality text color
     local r, g, b, hex = C_Item.GetItemQualityColor(WhoGotLootsSavedData.MinQuality)
@@ -309,6 +311,7 @@ scaleSlider:SetScript("OnMouseUp", function(self, button)
     WhoLootData.MainFrame:SetScale(value)
     WhoLootData.MainFrame.infoTooltip:SetScale(value)
     WhoLootData.MainFrame.cursorFrame:SetScale(value)
+    WGLUIBuilder.WhisperEditor:SetScale(value)
 end)
 WhoLootsOptionsEntries.ScaleSlider = scaleSlider
 

@@ -1,7 +1,7 @@
 WGLUIBuilder = WGLUIBuilder or {}
 
 WGLUIBuilder.WhisperMsgMaxChars = 160
-WGLUIBuilder.WhisperDefaultMessage = "Greetings, %n! I sense you hold %i. If it does not align with your destiny, would you consider trading it? Many thanks!"
+WGLUIBuilder.DefaultWhisperMessage = "Greetings, %n! I sense you hold %i. If it does not align with your destiny, would you consider trading it? Many thanks!"
 WGLUIBuilder.TempWhisperMesage = ""
 
 function WGLUIBuilder.CreateMainFrame()
@@ -228,7 +228,7 @@ function WGLUIBuilder.CreateMainFrame()
     mainFrame.WhisperWindow.DefaultBtn:SetSize(70, 14)
     mainFrame.WhisperWindow.DefaultBtn:SetText("Set to Default")
     mainFrame.WhisperWindow.DefaultBtn:SetScript("OnClick", function(self)
-        mainFrame.WhisperWindow.EditBox:SetText(WGLUIBuilder.WhisperDefaultMessage)
+        mainFrame.WhisperWindow.EditBox:SetText(WGLUIBuilder.DefaultWhisperMessage)
         PlaySound(856)
     end)
 
