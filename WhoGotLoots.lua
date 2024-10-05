@@ -49,7 +49,8 @@ function HandleEvents(self, event, ...)
     elseif event == "CHAT_MSG_LOOT" then 
 
         -- Does the message have the words "receive loot" or "receives loot" in it?
-        if not string.find(args[1], "receives? loot") then return end
+        --if not string.find(args[1], "receives? loot") then return end
+        if not string.find(args[1], "receives? loot") and not string.find(args[1], "You receive item") then return end
 
         -- Scrape the message for the item link. Item links look like "|cffffffff|Hitem:2589::::::::20:257::::::|h[Linen Cloth]|h|rx2.",
         -- and we can use a pattern to extract it.
@@ -126,7 +127,7 @@ function AddLootFrame(player, CompareItemLink)
     if string.find(player, "-") then player = string.match(player, "(.*)-") end
 
     -- If it was our loot, don't show the frame.
-    if player == UnitName("player") and WhoGotLootsSavedData.ShowOwnLoot ~= true then return end
+    if UnitIsUnit('player', player) and WhoGotLootsSavedData.ShowOwnLoot ~= true then return end
 
     -- If the player was "target" (this should only be for debugging) resolve it to a party member number.
     if player == "target" then
@@ -140,7 +141,7 @@ function AddLootFrame(player, CompareItemLink)
 
     -- Are we in a raid, and should we show raid loot?
     local isInRaid = IsPlayerInRaidInstance()
-    if (WhoGotLootsSavedData.ShowDuringRaid ~= true and isInRaid) or 
+    if (WhoGotLootsSavedData.ShowDuringRaid ~= true and isInRaid) or
         (isInRaid and WhoGotLootsSavedData.ShowDuringRaid == true and WhoGotLootsSavedData.ShowDuringLFR ~= true and IsRaidLFR()) then
         return
     end
