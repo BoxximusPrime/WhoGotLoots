@@ -1,6 +1,6 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-WhoLootDataVers = "1.4.3"
+WhoLootDataVers = "1.4.4"
 WGLU.DebugMode = false
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
@@ -564,12 +564,21 @@ function WhoLootData.SetupItemBoxFunctions(frame, itemLink, player)
                 ChatEdit_InsertLink(itemLink)
             -- Inspect
             elseif IsAltKeyDown() then
-                if not UnitIsUnit('player', player) and UnitPlayerControlled(player) and not InCombatLockdown() and CheckInteractDistance(player, 1) and CanInspect(player) then
-                    WGLU.DebugPrint("Inspecting " .. player)
-                    InspectUnit(player)
-                end
-                if InCombatLockdown() then
-                    print("Who Got Loots - Can't inspect while in combat.")
+                if not UnitIsUnit('player', player) then
+                    if UnitPlayerControlled(player) then
+                        if not InCombatLockdown() then
+                            if CanInspect(player) then
+                                WGLU.DebugPrint("Inspecting " .. player)
+                                InspectUnit(player)
+                            else
+                                print("Who Got Loots - Can't inspect " .. player .. ".")
+                            end
+                        else
+                            print("Who Got Loots - Addons can't inspect while in combat.")
+                        end
+                    else
+                        print("Who Got Loots - Can only inspect players.")
+                    end
                 end
             -- Open Trade
             elseif IsControlKeyDown() then
