@@ -10,12 +10,10 @@ WhoLootFrameData.HoverAnimTime = 0.3
 
 -- Animation values { start, end }
 WhoLootFrameData.ItemNameAnimPosLeft = { 35, 5 }
-WhoLootFrameData.BottomTextAnimPosLeft = { 35, 5 }
 WhoLootFrameData.IconAnimPosLeft = { 8, 7 }
 WhoLootFrameData.PlayerNameLeft = { 8, 5 }
 
 WhoLootFrameData.ItemNameAnimPosTop = { -5, -5 }
-WhoLootFrameData.BottomTextAnimPosTop = { -17, -17 }
 WhoLootFrameData.IconAnimPosTop = { -15, -15 }
 WhoLootFrameData.PlayerNameTop = { -5.5, -5.5    }
 
@@ -26,12 +24,11 @@ WhoLootFrameData.ExitColor = { 0.1, 0.1, 0.1, 1 }
 
 WhoLootFrameData.BorderColor = { 0.5, 0.5, 0.5, 1 }
 
-
 function WGL_FrameManager:CreateFrame()
 
     -- Create a new frame to display the player and item.
     local ItemFrame = CreateFrame("Frame", nil, WhoLootData.MainFrame)
-    ItemFrame:SetWidth(250)
+    ItemFrame:SetWidth(270)
     ItemFrame:SetHeight(48)
     ItemFrame:SetClipsChildren(true)
     WhoGotLootsFrames[#WhoGotLootsFrames + 1] = ItemFrame
@@ -42,6 +39,9 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.Animating = false
     ItemFrame.HoverAnimDelta = nil
     ItemFrame.Lifetime = WhoLootFrameData.FrameLifetime
+
+    -- Add a property to track if item is an upgrade
+    ItemFrame.IsUpgrade = false
 
     -- Create the background
     ItemFrame.background = CreateFrame("Frame", nil, ItemFrame);
@@ -124,20 +124,20 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.ItemText:SetText("item name")
     ItemFrame.ItemText:SetParent(ItemFrame)
 
-    ItemFrame.BottomText = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_Item_StatBottomText")
-    ItemFrame.BottomText:SetPoint("TOPLEFT", nil, "BOTTOMLEFT", 0, -4)
-    ItemFrame.BottomText:SetParent(ItemFrame)
-    ItemFrame.BottomText:SetText("Bottom Text")
-    ItemFrame.BottomText:SetJustifyH("LEFT")
-    ItemFrame.BottomText:SetJustifyV("TOP")
-    ItemFrame.BottomText:SetWordWrap(true)
-    ItemFrame.BottomText:SetNonSpaceWrap(false)
-    ItemFrame.BottomText:SetWidth(ItemFrame:GetWidth() - WhoLootFrameData.BottomTextAnimPosLeft[1] - 8)
-
-    ItemFrame.BottomText2 = ItemFrame:CreateFontString(nil, "OVERLAY", "WGLFont_Item_StatBottomText")
-    ItemFrame.BottomText2:SetPoint("TOPLEFT", ItemFrame.BottomText, "BOTTOMLEFT", 0, 0)
-    ItemFrame.BottomText2:SetParent(ItemFrame)
-    ItemFrame.BottomText2:SetText("Bottom Text")
+    -- Containers for the item stat breakdown.
+    ItemFrame.statContainer = {}
+    ItemFrame.statContainer.primary = CreateFrame("Frame", nil, ItemFrame)
+    ItemFrame.statContainer.primary:SetSize(ItemFrame:GetWidth() - ItemFrame.Icon:GetWidth() * 2 + 10,1)
+    ItemFrame.statContainer.primary:SetPoint("TOPLEFT", ItemFrame, "TOPLEFT", ItemFrame.Icon:GetWidth() + 10, -(ItemFrame.ItemText:GetHeight() + 8))
+    ItemFrame.statContainer.primary:SetPoint("TOPRIGHT", ItemFrame, "TOPRIGHT", -10, -(ItemFrame.ItemText:GetHeight() + 5))
+    ItemFrame.statContainer.secondary = CreateFrame("Frame", nil, ItemFrame)
+    ItemFrame.statContainer.secondary:SetSize(ItemFrame:GetWidth() - ItemFrame.Icon:GetWidth() * 2 + 10,1)
+    ItemFrame.statContainer.secondary:SetPoint("TOPLEFT", ItemFrame.statContainer.primary, "BOTTOMLEFT", 0, 0)
+    ItemFrame.statContainer.secondary:SetPoint("TOPRIGHT", ItemFrame.statContainer.primary, "BOTTOMRIGHT", 0, 0)
+    ItemFrame.statContainer.primary.frames = {}
+    ItemFrame.statContainer.secondary.frames = {}
+    ItemFrame.statContainer.primary.framePool = {}
+    ItemFrame.statContainer.secondary.framePool = {}
 
     -- Create a close button to remove the frame.
     ItemFrame.Close = CreateFrame("Button", nil, ItemFrame, "WGLCloseBtn")
@@ -205,15 +205,34 @@ function WGL_FrameManager:CreateFrame()
         self.Icon:ClearAllPoints()
         self.Icon:SetPoint("TOPLEFT", WhoLootFrameData.IconAnimPosLeft[1], WhoLootFrameData.IconAnimPosTop[1])
         self.Icon:SetAlpha(1)
-        self.BottomText:ClearAllPoints()
-        self.BottomText:SetPoint("TOPLEFT", WhoLootFrameData.BottomTextAnimPosLeft[1], WhoLootFrameData.BottomTextAnimPosTop[1])
-        self.BottomText2:ClearAllPoints()
-        self.BottomText2:SetPoint("TOPLEFT", ItemFrame.BottomText, "BOTTOMLEFT", 0, -2)
         self.Animating = false
         self.HoverAnimDelta = nil
         self.Lifetime = WhoLootFrameData.FrameLifetime
         self.InUse = false
         self.QueuedRequest = nil
+        self:UpdateStatBreakdownVisibility()
+    end
+
+    function ItemFrame:UpdateStatBreakdownVisibility()
+        local hideStatBreakdown = WhoGotLootsSavedData.HideStatBreakdown
+        local hideItemComparison = WhoGotLootsSavedData.HideItemComparison
+
+        if self.IsUpgrade then
+            -- Always show both containers for upgrades
+            self.statContainer.primary:Show()
+            self.statContainer.secondary:Show()
+        else
+            -- Handle non-upgrade items
+            if hideItemComparison then
+                self.statContainer.primary:Hide()
+                self.statContainer.secondary:Hide()
+            else
+                self.statContainer.primary:Show()
+                self.statContainer.secondary:SetShown(not hideStatBreakdown)
+            end
+        end
+
+        WGLUIBuilder.UpdateContainerPositions(ItemFrame)
     end
 
     function ItemFrame:DropIn(targetScale, duration)
@@ -277,3 +296,12 @@ for i = 1, WGL_NumPooledFrames do
     WGL_FrameManager:CreateFrame()
 end
 
+-- Function to update all existing frames based on the new options
+function WGL_FrameManager:UpdateAllFramesStatBreakdownVisibility()
+    for _, frame in ipairs(WhoGotLootsFrames) do
+        if frame.InUse then
+            frame:UpdateStatBreakdownVisibility()
+        end
+    end
+    WhoLootData.ResortFrames()
+end

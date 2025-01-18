@@ -4,6 +4,14 @@ WGLUIBuilder.WhisperMsgMaxChars = 160
 WGLUIBuilder.DefaultWhisperMessage = "Greetings, %n! I sense you hold %i. If it does not align with your destiny, would you consider trading it? Many thanks!"
 WGLUIBuilder.TempWhisperMesage = ""
 
+-- Add upgrade status constants
+WGLUIBuilder.UpgradeStatuses = {
+    UPGRADE = "+%d ilvl upgrade",
+    DOWNGRADE = "-%d ilvl downgrade",
+    EQUAL = "Equal Item Level",
+    UNKNOWN = nil
+}
+
 function WGLUIBuilder.CreateMainFrame()
 
     -- Create the main frame.
@@ -193,6 +201,47 @@ function WGLUIBuilder.CreateMainFrame()
         mainFrame.cursorFrame:EnableMouse(not toState)
     end
 
+    -- Add this function to update stat breakdown visibility
+    function mainFrame:UpdateStatBreakdownVisibility()
+        WGL_FrameManager:UpdateAllFramesStatBreakdownVisibility()
+    end
+
+    -- Add this after mainFrame creation
+    function mainFrame:CompareItemLevels(newItemLevel, equippedItemLevel)
+        if not newItemLevel or not equippedItemLevel then
+            return WGLUIBuilder.UpgradeStatuses.UNKNOWN
+        end
+        
+        local difference = newItemLevel - equippedItemLevel
+        if difference > 0 then
+            return string.format(WGLUIBuilder.UpgradeStatuses.UPGRADE, math.abs(difference)), true
+        elseif difference < 0 then
+            return string.format(WGLUIBuilder.UpgradeStatuses.DOWNGRADE, math.abs(difference)), false
+        else
+            return WGLUIBuilder.UpgradeStatuses.EQUAL, false
+        end
+    end
+
+    -- Add method to set item upgrade status on item frames
+    function mainFrame:SetItemUpgradeStatus(request, theirItemLevel)
+
+        -- We compare the dropped item level to their item level for the comparison text
+        local upgradeText, IsUpgradeForThem = self:CompareItemLevels(request.ItemLevel, theirItemLevel)
+        
+        -- Show glow if they have a higher item level AND it would be an upgrade for us
+        if request.IsUpgrade and not IsUpgradeForThem and request.GoodForPlayer then
+            request.Frame:ShowUpgradeGlow()
+
+            -- Make sure the stat breakdown is visible (this overrides the set option to hide, only for upgrades)
+            request.Frame.statContainer.secondary:Show()
+            request.Frame:UpdateStatBreakdownVisibility()
+        else
+            request.Frame:HideUpgradeGlow()
+        end
+        
+        return upgradeText
+    end
+
     WGLUIBuilder.DrawSlicedBG(mainFrame.cursorFrame, "SelectionBox", "backdrop", 0)
     WGLUIBuilder.ColorBGSlicedFrame(mainFrame.cursorFrame, "backdrop", 1, 1, 1, 0.25)
 
@@ -354,6 +403,7 @@ function WGLUIBuilder.CreateMainFrame()
     return mainFrame
 end
 
+
 FrameTextures =
 {
     OptionsWindowBG = {
@@ -401,8 +451,253 @@ FrameTextures =
         cornerSize = 4,
         cornerCoord = 0.2,
     },
+
+    ItemStatBG = {
+        file = "ItemBG",
+        cornerSize = 2,
+        cornerCoord = 0.2,
+    },
+
+    ItemStatBorder = {
+        file = "EdgedBorder_Sharp_Thick",
+        cornerSize = 2,
+        cornerCoord = 0.2,
+    },
 }
 
+-- Add this template definition after the FrameTextures table
+WGLUIBuilder.Templates = {
+    StatFrame = {
+        size = { height = 12 },
+        padding = 2, -- Added padding between frames
+        minWidth = 25, -- Minimum width for very short stats
+        textPadding = 1, -- Padding on either side of text
+        background = {
+            texture = "ItemStatBG",
+            color = { r = 1, g = 1, b = 1, a = 0.1 }
+        },
+        border = {
+            texture = "ItemStatBorder",
+            color = { r = 0.3, g = 0.3, b = 0.3, a = 0.8 }
+        },
+        text = {
+            font = "WGLFont_Item_StatBottomText",
+            colors = {
+                positive = { r = 0.384, g = 0.840, b = 0.294, a = 1.0 }, -- Bright green
+                negative = { r = 0.878, g = 0.333, b = 0.333, a = 1.0 }, -- Bright red
+                normal = { r = 1.0, g = 1.0, b = 1.0, a = 1.0 }
+            }
+        }
+    }
+}
+
+-- Add these new functions
+function WGLUIBuilder.CreateStatFrame(parent, width, text, color)
+
+    local template = WGLUIBuilder.Templates.StatFrame
+    local frame
+
+    -- Try to find an available frame from the pool
+    for _, pooledFrame in ipairs(parent.framePool) do
+        if not pooledFrame:IsShown() then
+            frame = pooledFrame
+            break
+        end
+    end
+
+    -- Create new frame if none available
+    if not frame then
+        frame = CreateFrame("Frame", nil, parent)
+        frame:SetSize(width, template.size.height)
+
+        -- Background and border
+        frame.bg = frame:CreateTexture(nil, "BACKGROUND")
+        frame.bg:SetAllPoints()
+        WGLUIBuilder.DrawSlicedBG(frame, template.background.texture, "backdrop", 0)
+        WGLUIBuilder.DrawSlicedBG(frame, template.border.texture, "border", 0)
+
+        -- Text
+        frame.text = frame:CreateFontString(nil, "OVERLAY", template.text.font)
+        frame.text:SetPoint("CENTER")
+
+        table.insert(parent.framePool, frame)
+    end
+
+    -- Reset and configure the frame
+    frame:Show()
+    frame:SetSize(width, template.size.height)
+
+    -- Set colors
+    WGLUIBuilder.ColorBGSlicedFrame(frame, "backdrop",
+        template.background.color.r,
+        template.background.color.g,
+        template.background.color.b,
+        template.background.color.a)
+
+    WGLUIBuilder.ColorBGSlicedFrame(frame, "border",
+        template.border.color.r,
+        template.border.color.g,
+        template.border.color.b,
+        template.border.color.a)
+
+    -- Update text
+    text = text:gsub("(%S+)", function(word)
+        return word:sub(1,1):upper() .. word:sub(2)
+    end)
+    frame.text:SetText(text)
+
+    -- Set text color
+    if color then
+        frame.text:SetTextColor(color.r, color.g, color.b, color.a)
+    else
+        -- Detect if this stat has a + or - sign
+        if string.find(text, "-") then
+            frame.text:SetTextColor(
+                template.text.colors.negative.r,
+                template.text.colors.negative.g,
+                template.text.colors.negative.b,
+                template.text.colors.negative.a
+            )
+        elseif string.find(text, "+") then
+            frame.text:SetTextColor(
+                template.text.colors.positive.r,
+                template.text.colors.positive.g,
+                template.text.colors.positive.b,
+                template.text.colors.positive.a
+            )
+        else
+            frame.text:SetTextColor(
+                template.text.colors.normal.r,
+                template.text.colors.normal.g,
+                template.text.colors.normal.b,
+                template.text.colors.normal.a
+            )
+        end
+    end
+
+    -- Add to active frames
+    table.insert(parent.frames, frame)
+
+    return frame
+end
+
+function WGLUIBuilder.AddStatToBreakdown(parentFrame, text, position, color, indexOffset, container)
+
+    container = container or "secondary" -- Default to primary if not specified
+
+    if not parentFrame.statContainer or not parentFrame.statContainer[container] then
+        print("WGL Error - No stat container found for " .. container .. ".")
+        return
+    end
+
+    local containerFrame = parentFrame.statContainer[container]
+
+    -- Create measurement text if it doesn't exist
+    if not WGLUIBuilder.measureText then
+        WGLUIBuilder.measureText = UIParent:CreateFontString(nil, "OVERLAY")
+        WGLUIBuilder.measureText:SetFontObject(WGLUIBuilder.Templates.StatFrame.text.font)
+    end
+    
+    -- Measure text width
+    WGLUIBuilder.measureText:SetText(text)
+    local width = WGLUIBuilder.measureText:GetStringWidth()
+    local template = WGLUIBuilder.Templates.StatFrame
+    width = math.max(width + template.textPadding * 2, template.minWidth)
+    
+    -- Create the new stat frame
+    local frame = WGLUIBuilder.CreateStatFrame(
+        parentFrame.statContainer[container],
+        width,
+        text,
+        color
+    )
+
+    -- Add to frames array based on position and offset
+    local insertIndex
+    if position == "prepend" then
+        insertIndex = indexOffset and indexOffset or 1
+    else
+        insertIndex = indexOffset and #containerFrame + 1 - indexOffset or #containerFrame + 1
+    end
+    
+    -- Ensure insert index is within bounds
+    insertIndex = math.max(1, math.min(insertIndex, #containerFrame + 1))
+    table.insert(containerFrame, insertIndex, frame)
+
+    -- Calculate positions for all frames in this container
+    local xOffset = 0
+    local yOffset = 0
+    local maxWidth = parentFrame.statContainer[container]:GetWidth()
+    local rowHeight = template.size.height
+
+    for _, existingFrame in ipairs(containerFrame.frames) do
+        local frameWidth = existingFrame:GetWidth()
+        
+        -- Check if this frame would overflow the row
+        if xOffset + frameWidth > maxWidth then
+            xOffset = 0
+            yOffset = yOffset + rowHeight + template.padding
+        end
+
+        -- Position the frame and update xOffset
+        existingFrame:SetPoint("TOPLEFT", parentFrame.statContainer[container], "TOPLEFT", xOffset, -yOffset)
+        xOffset = xOffset + frameWidth + template.padding
+    end
+    
+    -- Update container height
+    parentFrame.statContainer[container]:SetHeight(yOffset + rowHeight + template.padding)
+    
+    -- Update container positions and parent frame height
+    WGLUIBuilder.UpdateContainerPositions(parentFrame)
+    
+    return frame
+end
+
+-- Add this new function after CreateStatBreakdownFrames
+function WGLUIBuilder.ClearStatContainer(parentFrame)
+    if parentFrame.statContainer then
+        -- Hide and clear all stat frames from both containers
+        for _, container in pairs(parentFrame.statContainer) do
+            if container.frames then
+                for _, frame in pairs(container.frames) do
+                    frame:Hide()
+                    frame:ClearAllPoints()
+                end
+            end
+            container.frames = {}
+        end
+    end
+end
+
+function WGLUIBuilder.CreateStatBreakdownFrames(parentFrame, bottomText)
+
+    -- Clear everything first
+    WGLUIBuilder.ClearStatContainer(parentFrame)
+
+    -- Process the stats and calculate widths
+    for _, text in ipairs(bottomText) do
+        WGLUIBuilder.AddStatToBreakdown(parentFrame, text, "append", nil, nil, "secondary")
+    end
+
+end
+
+-- Add this new function after CreateStatBreakdownFrames
+function WGLUIBuilder.UpdateContainerPositions(parentFrame)
+
+    -- Push the secondary down below the primary
+    parentFrame.statContainer.secondary:SetPoint("TOPLEFT", parentFrame.statContainer.primary, "BOTTOMLEFT", 0, 0)
+    parentFrame.statContainer.secondary:SetPoint("TOPRIGHT", parentFrame.statContainer.primary, "BOTTOMRIGHT", 0, 0)
+    
+    local totalFrameHeight =
+        (parentFrame.statContainer.primary:IsShown() and parentFrame.statContainer.primary:GetHeight() or 0) +
+        (parentFrame.statContainer.secondary:IsShown() and parentFrame.statContainer.secondary:GetHeight() or 0)
+    totalFrameHeight = totalFrameHeight + 22
+
+    -- Set a minimum size.
+    totalFrameHeight = math.max(totalFrameHeight, 45)
+
+    parentFrame:SetHeight(totalFrameHeight)
+end
 
 function WGLUIBuilder.DrawSlicedBG(frame, textureKey, layer, shrink)
     shrink = shrink or 0;

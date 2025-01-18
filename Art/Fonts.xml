@@ -27,5 +27,4 @@
     <font name="WGLFont_Tooltip" font="Interface\Addons\WhoGOtLoots\Fonts\hk-grotesk.medium.ttf" height="8" virtual="true">
         <Color r="0.65" g="0.65" b="0.65"/>
     </font>
-    
 </Ui>

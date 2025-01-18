@@ -1,6 +1,6 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-WhoLootDataVers = "1.4.4"
+WhoLootDataVers = "1.5.0"
 WGLU.DebugMode = false
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
@@ -18,6 +18,7 @@ WhoLootFrameData = WhoLootFrameData or {}
 -- Handle Events --
 function HandleEvents(self, event, ...)
     local args = {...}
+
     if event == "ADDON_LOADED" and args[1] == "WhoGotLoots" then
         WhoGotLootsSavedData = WhoGotLootsSavedData or {}
         WhoLootsOptionsEntries.LoadOptions()
@@ -46,18 +47,17 @@ function HandleEvents(self, event, ...)
         else
             WhoLootData.MainFrame:Move({"CENTER", nil, "CENTER"})
         end
-    elseif event == "CHAT_MSG_LOOT" then 
+    elseif event == "CHAT_MSG_LOOT" then
 
-        -- Does the message have the words "receive loot" or "receives loot" in it?
-        --if not string.find(args[1], "receives? loot") then return end
-        if not string.find(args[1], "receives? loot") and not string.find(args[1], "You receive item") then return end
+        -- Scrape the message for item links. Item links look like "|cffffffff|Hitem:2589::::::::20:257::::::|h[Linen Cloth]|h|rx2.",
+        local itemLinks = {}
+        for itemLink in args[1]:gmatch("|c.-|H.-:.-|h.-|h|r") do
+            table.insert(itemLinks, itemLink)
+        end
 
-        -- Scrape the message for the item link. Item links look like "|cffffffff|Hitem:2589::::::::20:257::::::|h[Linen Cloth]|h|rx2.",
-        -- and we can use a pattern to extract it.
-        local message = args[1]
-        local itemLink = message:match("|c.-|Hitem:.-|h.-|h|r")
-        if itemLink then
-            AddLootFrame(args[2], itemLink)
+        -- Only call AddLootFrame if exactly one item was detected
+        if #itemLinks == 1 then
+            AddLootFrame(args[2], itemLinks[1])
         end
     end
 end
@@ -168,17 +168,17 @@ function AddLootFrame(player, CompareItemLink)
     if type(CompareItemLink) == "string" then CompareItem = Item:CreateFromItemLink(CompareItemLink) end
 
     CompareItem:ContinueOnItemLoad(function()
-
+        
         local CompareItemID = C_Item.GetItemIDForItemInfo(CompareItemLink)
         local CompareItemIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(CompareItemLink)
         local itemName, linkedItem, itemQuality, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expansionID, setID, isCraftingReagent = C_Item.GetItemInfo(CompareItemLink)
-
+        
         if type(CompareItemLink) == "number" then CompareItemLink = linkedItem end
 
         if itemQuality < WhoGotLootsSavedData.MinQuality then return end
 
         -- We only worry about armor and weapons.
-        if itemType ~= "Armor" and itemType ~= "Weapon" then return end
+        if classID ~= Enum.ItemClass.Armor and classID ~= Enum.ItemClass.Weapon then return end
 
         -- Is it a cosmetic item?
         if C_Item.IsCosmeticItem(CompareItemID) then return end
@@ -212,8 +212,8 @@ function AddLootFrame(player, CompareItemLink)
         local IsClassRestricted = false
         local IsDowngradeForOtherPlayer = UnitIsUnit('player', player) -- Logic is handled differnetly for the player, so we need to know if it's the player or not.
 
-        local BottomText = {}
-        local BottomText2 = {}
+        local SecondaryStatsLine = {}
+        local PriorityStatsLine = {}
 
         -- If this is a ring, or neck we dont need to worry about the main stat.
         if itemEquipLoc == "INVTYPE_FINGER" or itemEquipLoc == "INVTYPE_NECK" or itemEquipLoc == "INVTYPE_TRINKET" then
@@ -244,7 +244,7 @@ function AddLootFrame(player, CompareItemLink)
                 if foundClass and string.lower(foundClass) ~= string.lower(select(2, UnitClass("player"))) then
                     IsClassRestricted = true
                     if WhoGotLootsSavedData.HideUnequippable then return else
-                        table.insert(BottomText, "|cFFFF0000Restricted to " .. foundClass .. "|r")
+                        table.insert(SecondaryStatsLine, "|cFFFF0000Restricted to " .. foundClass .. "|r")
                     end
                 end
             end
@@ -258,9 +258,9 @@ function AddLootFrame(player, CompareItemLink)
                 local otherPlayerItemIlvl = otherItemLink and C_Item.GetDetailedItemLevelInfo(otherItemLink) or 0
                 if otherPlayerItemIlvl > CompareItemIlvl then
                     IsDowngradeForOtherPlayer = true
-                    table.insert(BottomText2, "|cFFFFFFFFThem:|r |cFFb7d672|r " .. (otherPlayerItemIlvl - CompareItemIlvl) .. " ilvl downgrade")
+                    table.insert(PriorityStatsLine, "|cFFFFFFFFThem: |cFFb7d672" .. string.format(WGLUIBuilder.UpgradeStatuses.DOWNGRADE, otherPlayerItemIlvl - CompareItemIlvl) .. "|r")
                 else
-                    table.insert(BottomText2, "|cFFFFFFFFThem:|r |cFFe28743" .. (otherPlayerItemIlvl - CompareItemIlvl) .. " ilvl upgrade|r")
+                    table.insert(PriorityStatsLine, "|cFFFFFFFFThem: |cFFe28743" .. string.format(WGLUIBuilder.UpgradeStatuses.UPGRADE, CompareItemIlvl - otherPlayerItemIlvl) .. "|r")
                 end
             else
                 CacheRequest = { ["ItemLocation"] = CurrentSlotID, ["ItemLevel"] = CompareItemIlvl, ["ItemID"] = CompareItemID }
@@ -273,20 +273,30 @@ function AddLootFrame(player, CompareItemLink)
         if CanEquip == true and IsAppropriate == true and ItemHasMainStat == true and IsClassRestricted ~= true then
 
             -- First, check if we're at the minimum character level.
-            if UnitLevel("player") < itemMinLevel then table.insert(BottomText, "|cFFFF0000Level " .. itemMinLevel .. "|r") end
+            if UnitLevel("player") < itemMinLevel then table.insert(SecondaryStatsLine, "|cFFFF0000Level " .. itemMinLevel .. "|r") end
 
             -- If we have a unique equipped, then we don't want to show it.
-            if IsUnique then table.insert(BottomText, "|cFFFF0000Unique Equipped|r") end
+            if IsUnique then table.insert(SecondaryStatsLine, "|cFFFF0000Unique Equipped|r") end
 
             -- Give a stat breakdown.
             if not IsUnique then
 
                 -- Show the ilvl diff if any
                 local ilvlDiff = not NoCompare and CompareItemIlvl - CurrentItemIlvl or CompareItemIlvl
-                local color = not NoCompare and (ilvlDiff > 0 and "|cFF00FF00" or ilvlDiff < 0 and "|cFFFF0000") or ""
-                local sign = not NoCompare and ilvlDiff > 0 and "+" or ""
-                local text = ilvlDiff ~= 0 and color .. sign .. ilvlDiff .. "|r ilvl" or (NoCompare and CompareItemIlvl .. " ilvl" or "+0 ilvl")
-                table.insert(BottomText, text)
+                local ilvlText
+                if not NoCompare then
+                    if ilvlDiff > 0 then
+                        ilvlText = "|cFFFFFFFFYou:|r " .. string.format(WGLUIBuilder.UpgradeStatuses.UPGRADE, ilvlDiff)
+                    elseif ilvlDiff < 0 then
+                        ilvlText = "|cFFFFFFFFYou:|r " .. string.format(WGLUIBuilder.UpgradeStatuses.DOWNGRADE, math.abs(ilvlDiff))
+                    else
+                        ilvlText = WGLUIBuilder.UpgradeStatuses.EQUAL
+                    end
+                else
+                    ilvlText = CompareItemIlvl .. " ilvl"
+                end
+                
+                table.insert(PriorityStatsLine, 1, ilvlText)
 
                 -- Get the compare item's stats.
                 local CompareItemStats = C_Item.GetItemStats(CompareItemLink)
@@ -306,11 +316,11 @@ function AddLootFrame(player, CompareItemLink)
                 local diffStatText = ""
                 if diffStat ~= 0 and CompareItemMainStat ~= -1 then
                     if diffStat > 0 then
-                        diffStatText = "|cFF00FF00" .. (not NoCompare and "+" or "") .. diffStat .. "|r"
+                        diffStatText = (not NoCompare and "+" or "") .. diffStat
                     elseif diffStat < 0 then
-                        diffStatText = "|cFFFF0000" .. diffStat .. "|r"
+                        diffStatText = diffStat .. "|r"
                     end
-                    table.insert(BottomText, diffStatText .. " " .. PlayerTopStat)
+                    table.insert(SecondaryStatsLine, diffStatText .. " " .. PlayerTopStat)
                 end
 
                 local stats = {
@@ -361,68 +371,43 @@ function AddLootFrame(player, CompareItemLink)
                     end
                 end
 
-                local StatString = {}
-                
-                -- Compare the stats.
+                -- Separate positive and negative stats
+                local positiveStats = {}
+                local negativeStats = {}
+
+                -- Compare the stats and separate them
                 for _, stat in ipairs(preferredOrder) do
                     local value = stats[stat]
                     local diff = value.theirs - value.ours
                     local statName = WGLU.SimplifyStatName(stat)
 
                     if statName ~= nil then
-                        -- Overrides for some stats.
-                        if(statName == "Indest") then
+                        -- Overrides for some stats
+                        if statName == "Indest" then
                             if diff > 0 then
-                                table.insert(StatString, "|cFF00FF00+Indestructible|r")
+                                table.insert(positiveStats, "|cFF00FF00+Indestructible|r")
                             elseif diff < 0 then
-                                table.insert(StatString, "|cFFFF0000-Indestructible|r")
+                                table.insert(negativeStats, "|cFFFF0000-Indestructible|r")
                             end
                         -- Normal stat display
                         else
                             if diff > 0 then
-                                table.insert(StatString, "|cFF00FF00" .. (not NoCompare and "+" or "") .. diff .. "|r " .. statName)
+                                table.insert(positiveStats, (not NoCompare and "+" or "") .. diff .. " " .. statName)
                             elseif diff < 0 then
-                                table.insert(StatString, "|cFFFF0000" .. diff .. "|r " .. statName .. ",")
+                                table.insert(negativeStats, diff .. " " .. statName)
                             end
                         end
                     end
                 end
 
-                -- Sort the BottomText stat breakdown. We want upgraded things to be first.
-                table.sort(StatString, function(a, b)
-                    local aStat = a:match("|c.-|r%s*(.-)$")
-                    local bStat = b:match("|c.-|r%s*(.-)$")
-                    local aIndex = #preferredOrder + 1
-                    local bIndex = #preferredOrder + 1
-                
-                    for i, stat in ipairs(preferredOrder) do
-                        if stat == aStat then
-                            aIndex = i
-                        end
-                        if stat == bStat then
-                            bIndex = i
-                        end
-                    end
-                
-                    if a:find("+") and not b:find("+") then
-                        return true
-                    elseif not a:find("+") and b:find("+") then
-                        return false
-                    elseif aIndex ~= bIndex then
-                        return aIndex < bIndex
-                    else
-                        return a < b
-                    end
-                end)
-
-                -- Remove the last entry's comma.
-                if #StatString > 0 then
-                    StatString[#StatString] = StatString[#StatString]:gsub(",$", "")
+                -- Add positive stats first
+                for _, statText in ipairs(positiveStats) do
+                    table.insert(SecondaryStatsLine, statText)
                 end
 
-                -- Add it to our BottomText.
-                for i, stat in ipairs(StatString) do
-                    table.insert(BottomText, stat)
+                -- Then add negative stats
+                for _, statText in ipairs(negativeStats) do
+                    table.insert(SecondaryStatsLine, statText)
                 end
             end
         end
@@ -431,11 +416,14 @@ function AddLootFrame(player, CompareItemLink)
 
         -- Display why we can't equip the item.
         if CanEquip == false then
-            table.insert(BottomText, "|cFFFF0000Can't equip " .. C_Item.GetItemSubClassInfo(classID, subclassID) .. "|r")
+            table.insert(SecondaryStatsLine, "|cFFFF0000Can't equip " .. C_Item.GetItemSubClassInfo(classID, subclassID) .. "|r")
         elseif IsAppropriate == false then
-            table.insert(BottomText, "|cFFe28743" .. string.lower(C_Item.GetItemSubClassInfo(classID, subclassID)) .. " - Undesired Type|r")
+            -- Capitalize first letter of item type using gsub
+            local itemTypeStringed = C_Item.GetItemSubClassInfo(classID, subclassID)
+            itemTypeStringed = itemTypeStringed:gsub("^%l", string.upper)
+            table.insert(SecondaryStatsLine, "|cFFe28743" .. itemTypeStringed .. " - Undesired Type|r")
         elseif ItemHasMainStat == false then
-            table.insert(BottomText, "|cFFFF0000No " .. PlayerTopStat .. "|r")
+            table.insert(SecondaryStatsLine, "|cFFFF0000No " .. PlayerTopStat .. "|r")
         end
 
         -- Look into the Frame Manager and find an available frame.
@@ -447,6 +435,7 @@ function AddLootFrame(player, CompareItemLink)
             end
         end
 
+        -- If we found a frame, then we can use it.
         if frame then
 
             -- Unhide the main window
@@ -458,9 +447,10 @@ function AddLootFrame(player, CompareItemLink)
             if CacheRequest and not IsBoP then
                 CacheRequest.Frame = frame
                 CacheRequest.CompareIlvl = CompareItemIlvl
+                CacheRequest.OurItemLevel = CurrentItemIlvl
                 CacheRequest.GoodForPlayer = CanEquip and IsAppropriate and not IsClassRestricted
                 CacheRequest.IsUpgrade =  CompareItemIlvl > CurrentItemIlvl
-                CacheRequest.TextString = table.concat(BottomText2, " ")
+                CacheRequest.TextString = table.concat(PriorityStatsLine, " | ")
                 frame.QueuedRequest = WGLCache.CreateRequest(player, CacheRequest)
                 frame.LoadingIcon:Unhide()
             else
@@ -470,15 +460,6 @@ function AddLootFrame(player, CompareItemLink)
             -- Do we need to show the upgrade glow right now?
             if not CacheRequest and not IsBoP and CanEquip and IsAppropriate and IsDowngradeForOtherPlayer and CompareItemIlvl > CurrentItemIlvl then
                 frame:ShowUpgradeGlow()
-            end
-
-            -- Make sure that the entry with "ilvl" is always first.
-            for i, text in ipairs(BottomText) do
-                if text:find("ilvl") then
-                    table.insert(BottomText, 1, text)
-                    table.remove(BottomText, i + 1)
-                    break
-                end
             end
 
             local playerClass = select(2, UnitClass(player))
@@ -496,43 +477,16 @@ function AddLootFrame(player, CompareItemLink)
             frame.ItemText:SetText("|c" .. select(4, C_Item.GetItemQualityColor(itemQuality)) .. "[" .. itemName  .. "]" .. "|r")
             frame.ItemText:ClearAllPoints()
             frame.ItemText:SetPoint("LEFT", frame.PlayerArrow, "RIGHT", 4, -1)
-            
-            frame.BottomText2:SetText("")
 
-            -- If we're comparing items against someone else, and we have the data, show the comparison.
-            local CompareItemAppend = ""
-            if not NoCompare then
-                CompareItemAppend = not UnitIsUnit('player', player) and "|cFFFFFFFFYou:|r " or ""
+            if IsBoP then table.insert(PriorityStatsLine, 1, "|cFF6fcbe3Is BoP|r ") end
+
+            -- Create stat breakdown frames with processed stats
+            WGLUIBuilder.CreateStatBreakdownFrames(frame, SecondaryStatsLine)
+
+            for _, stat in ipairs(PriorityStatsLine) do
+                WGLUIBuilder.AddStatToBreakdown(frame, stat, "append", nil, 0, "primary")
             end
 
-            if IsBoP then CompareItemAppend = CompareItemAppend .. "|cFF6fcbe3Is BoP|r " end
-
-            -- If we don't have anything in the BottomText2 string, then use BottomText and BottomText2 to split the text.
-            if #BottomText2 == 0 and #BottomText > 3 and not CacheRequest and UnitIsUnit('player', player) then
-                -- Move the last half of the BottomText to BottomText2.
-                local half = math.ceil(#BottomText / 2) + 1
-                for i = half, #BottomText do
-                    table.insert(BottomText2, BottomText[i])
-                    BottomText[i] = nil
-                end
-            
-                -- Insert some blank space at the beginning of BottomText2
-                local bottomTextCombined = table.concat(BottomText2, " ") -- "         " is 9 spaces.
-            
-                frame.BottomText:SetText(CompareItemAppend .. table.concat(BottomText, " "))
-                frame.BottomText2:SetText(bottomTextCombined)
-            else
-                frame.BottomText:SetText(CompareItemAppend .. table.concat(BottomText, " "))
-            
-                if not IsBoP then
-                    if CacheRequest then
-                        frame.BottomText2:SetText("Inspecting ...")
-                    else
-                        frame.BottomText2:SetText(table.concat(BottomText2, " "))
-                    end
-                end
-            end
-            
             frame.Icon:SetTexture(itemTexture)
             frame.Item = CompareItemLink
             frame:DropIn(1.0, 0.2)
@@ -666,16 +620,20 @@ end
 
 -- Function to resort the frames, if we remove one.
 function WhoLootData.ResortFrames()
+    local currentOffset = -8  -- Starting offset
     
-    -- Loop through the in-use frames, and set their position starting at the top of the mainwindowbg.
-    local numFrames = #WhoLootData.ActiveFrames
     for i, frame in ipairs(WhoLootData.ActiveFrames) do
         frame:ClearAllPoints()
-        frame:SetPoint("TOP", WhoLootData.MainFrame, "BOTTOM", 0, (i - 1) * -(frame:GetHeight() - 0) + 8 )
+        frame:SetPoint("TOP", WhoLootData.MainFrame, "BOTTOM", 0, -currentOffset)
+        currentOffset = currentOffset + frame:GetHeight()  -- Add this frame's height for the next iteration
     end
 
-    -- If there are no frames to show, and the option is enabled, hide the main window.
+    -- Rest of your existing code...
+    local numFrames = #WhoLootData.ActiveFrames
     if numFrames == 0 and WhoGotLootsSavedData.AutoCloseOnEmpty == true then
+        for _, frame in ipairs(WhoGotLootsFrames) do
+            WGLUIBuilder.ClearStatContainer(frame)
+        end
         WhoLootData.MainFrame:Close()
     end
 end

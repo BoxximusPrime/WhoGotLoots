@@ -53,11 +53,9 @@ function WGLCache.CreateRequest(unitName, request)
         -- If we're not currently querying, then we can send the inspect request.
         if WGLCacheCurrentQuery == nil then
             WGLCacheCurrentQuery = request
-            request.Frame.BottomText2:SetText("Inspecting ...")
             NotifyInspect(unitName)
             request.QueryStage = WGLCacheCacheStage.Sent
         else
-            request.Frame.BottomText2:SetText("Inspection Queued")
             WGLU.DebugPrint("Can't queue now, waiting for " .. playerGUID)
             request.QueryStage = WGLCacheCacheStage.Queued
         end
@@ -100,10 +98,10 @@ local function GetLowestItemLink(unitName, slot1, slot2)
     return nil
 end
 
-local function SetText(request, text)
+-- TODO: This was using the old text, need to update it to use the new text.
+local function SetText(request, text, itemLevel)
     if not request.Frame then return end
     request.Frame.LoadingIcon:FadeOut()
-    request.Frame.BottomText2:SetText(text)
 end
 
 local function HandleInspections(fromTimer)
@@ -133,21 +131,19 @@ local function HandleInspections(fromTimer)
                     table.insert(keysToRemove, ID)
                     request.QueryStage = WGLCacheCacheStage.Finished
 
-                    local itemLevel = C_Item.GetDetailedItemLevelInfo(itemLink)
-                    local playerName = select(6, GetPlayerInfoByGUID(request.PlayerGUID))
+                    local theirItemLevel = C_Item.GetDetailedItemLevelInfo(itemLink)
 
-                    if itemLevel < request.ItemLevel then
-                        SetText(request, "|cFFFFFFFFThem: |cFFe28743+" .. request.ItemLevel - itemLevel .. " ilvl upgrade for " .. playerName .. "|r")
+                    -- Get upgrade text from UIBuilder - pass their item level first, then the dropped item level
+                    local upgradeText = WhoLootData.MainFrame:SetItemUpgradeStatus(request, theirItemLevel)
+                    
+                    if theirItemLevel < request.ItemLevel then
+                        WGLUIBuilder.AddStatToBreakdown(request.Frame, "|cFFFFFFFFThem: |cFFe28743" .. upgradeText .. "|r", "prepend", nil, 2, "primary")
                     else
                         if request.GoodForPlayer then
-                            if request.IsUpgrade then request.Frame:ShowUpgradeGlow() end
-                            SetText(request, "|cFFFFFFFFThem:|r |cFFb7d672" .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
+                            WGLUIBuilder.AddStatToBreakdown(request.Frame, "|cFFFFFFFFThem:|r |cFFb7d672" .. upgradeText, "prepend", nil, 2, "primary")
                         else
-                           SetText(request, "|cFFFFFFFFThem:|r " .. (itemLevel - request.ItemLevel) .. " ilvl downgrade")
+                            WGLUIBuilder.AddStatToBreakdown(request.Frame, "|cFFFFFFFFThem:|r " .. upgradeText, "prepend", nil, 2, "primary")
                         end
-                    end
-                    if request.TextString ~= "" then
-                        SetText(request, request.Frame.BottomText2:GetText() .. ', ' .. request.TextString)
                     end
 
                     request.Frame.LoadingIcon:FadeOut()

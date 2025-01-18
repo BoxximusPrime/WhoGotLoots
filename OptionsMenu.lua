@@ -27,6 +27,8 @@ function WhoLootsOptionsEntries.LoadOptions()
     if WhoGotLootsSavedData.ShowDuringRaid == nil then WhoGotLootsSavedData.ShowDuringRaid = true end
     if WhoGotLootsSavedData.ShowDuringLFR == nil then WhoGotLootsSavedData.ShowDuringLFR = false end
     if WhoGotLootsSavedData.MinQuality == nil then WhoGotLootsSavedData.MinQuality = 3 end
+    if WhoGotLootsSavedData.HideStatBreakdown == nil then WhoGotLootsSavedData.HideStatBreakdown = false end
+    if WhoGotLootsSavedData.HideItemComparison == nil then WhoGotLootsSavedData.HideItemComparison = false end
 
     WhoLootsOptionsEntries.AutoClose:SetChecked(WhoGotLootsSavedData.AutoCloseOnEmpty)
     WhoLootsOptionsEntries.LockWindow:SetChecked(WhoGotLootsSavedData.LockWindow)
@@ -37,6 +39,8 @@ function WhoLootsOptionsEntries.LoadOptions()
     WhoLootsOptionsEntries.ShowDuringRaid:SetChecked(WhoGotLootsSavedData.ShowDuringRaid)
     WhoLootsOptionsEntries.ShowDuringLFR:SetChecked(WhoGotLootsSavedData.ShowDuringLFR)
     WhoLootsOptionsEntries.MinQualitySlider:SetValue(WhoGotLootsSavedData.MinQuality)
+    WhoLootsOptionsEntries.HideStatBreakdown:SetChecked(WhoGotLootsSavedData.HideStatBreakdown)
+    WhoLootsOptionsEntries.HideItemComparison:SetChecked(WhoGotLootsSavedData.HideItemComparison)
 
     if WhoGotLootsSavedData.WhisperMessage ~= nil then
         WhoLootsOptionsFrame.whisperPreview:SetText(WhoGotLootsSavedData.WhisperMessage)
@@ -239,11 +243,44 @@ end)
 
 WhoLootsOptionsEntries.MinQualitySlider = minQualitySlider
 
+-- Checkbox: Hide Stat Breakdown
+local HideStatBreakdown = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
+WGLUIBuilder.AddOnClick(HideStatBreakdown, function(self) 
+    local tick = self:GetChecked()
+    WhoGotLootsSavedData.HideStatBreakdown = tick
+    WGL_FrameManager:UpdateAllFramesStatBreakdownVisibility()
+end)
+HideStatBreakdown.Label:SetText("Hide Stat Breakdown")
+HideStatBreakdown:SetPoint("TOPLEFT", minQualitySlider, "BOTTOMLEFT", 0, -28)
+HideStatBreakdown:SetParent(contentFrame)
+WhoLootsOptionsEntries.HideStatBreakdown = HideStatBreakdown
+-- Option text
+local hideStatBreakdown_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+hideStatBreakdown_Desc:SetPoint("TOPLEFT", HideStatBreakdown, "BOTTOMLEFT", 15, -8)
+hideStatBreakdown_Desc:SetText("Hides the stat breakdown text for each item.")
+hideStatBreakdown_Desc:SetParent(contentFrame)
+
+-- Checkbox: Hide Item Comparison
+local HideItemComparison = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
+WGLUIBuilder.AddOnClick(HideItemComparison, function(self) 
+    local tick = self:GetChecked()
+    WhoGotLootsSavedData.HideItemComparison = tick
+    WGL_FrameManager:UpdateAllFramesStatBreakdownVisibility()
+end)
+HideItemComparison.Label:SetText("Hide Item Comparison")
+HideItemComparison:SetPoint("TOPLEFT", HideStatBreakdown, "BOTTOMLEFT", 0, -30)
+HideItemComparison:SetParent(contentFrame)
+WhoLootsOptionsEntries.HideItemComparison = HideItemComparison
+-- Option text
+local hideItemComparison_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+hideItemComparison_Desc:SetPoint("TOPLEFT", HideItemComparison, "BOTTOMLEFT", 15, -8)
+hideItemComparison_Desc:SetText("Hides the item comparison text for each item.")
+
 -- Checkbox: Show During Raid
 local ShowDuringRaid = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(ShowDuringRaid, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.ShowDuringRaid = tick; end)
 ShowDuringRaid.Label:SetText("Show During Raid")
-ShowDuringRaid:SetPoint("TOPLEFT", minQualitySlider, "BOTTOMLEFT", 0, -28)
+ShowDuringRaid:SetPoint("TOPLEFT", HideItemComparison, "BOTTOMLEFT", 0, -30)
 ShowDuringRaid:SetParent(contentFrame)
 WhoLootsOptionsEntries.ShowDuringRaid = ShowDuringRaid
 -- Option text
@@ -262,7 +299,6 @@ WhoLootsOptionsEntries.ShowDuringLFR = ShowDuringLFR
 local showDuringLFR_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
 showDuringLFR_Desc:SetPoint("TOPLEFT", ShowDuringLFR, "BOTTOMLEFT", 15, -8)
 showDuringLFR_Desc:SetText("Show loot while in LFR.")
-
 
 -- Sound Toggle
 local SoundToggle = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
