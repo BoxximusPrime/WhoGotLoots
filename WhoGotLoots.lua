@@ -1,6 +1,6 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-WhoLootDataVers = "1.5.0"
+WhoLootDataVers = "1.5.1"
 WGLU.DebugMode = false
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
@@ -48,6 +48,9 @@ function HandleEvents(self, event, ...)
             WhoLootData.MainFrame:Move({"CENTER", nil, "CENTER"})
         end
     elseif event == "CHAT_MSG_LOOT" then
+
+        -- Make sure we have an assosciated player.
+        if args[2] == nil or args[2] == "" then return end
 
         -- Scrape the message for item links. Item links look like "|cffffffff|Hitem:2589::::::::20:257::::::|h[Linen Cloth]|h|rx2.",
         local itemLinks = {}
@@ -138,6 +141,9 @@ function AddLootFrame(player, CompareItemLink)
             end
         end
     end
+
+    -- Could we not find the player?
+    if player == "" then return end
 
     -- Are we in a raid, and should we show raid loot?
     local isInRaid = IsPlayerInRaidInstance()
