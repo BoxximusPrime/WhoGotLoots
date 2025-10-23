@@ -1,6 +1,6 @@
 -- Define a table to store global variables
 WhoLootData = WhoLootData or {}
-WhoLootDataVers = "1.5.1"
+WhoLootDataVers = "1.5.2"
 WGLU.DebugMode = false
 
 WhoLootData.ActiveFrames = {} -- A table to store all active frames.
@@ -35,6 +35,7 @@ function HandleEvents(self, event, ...)
         WhoLootData.MainFrame.infoTooltip:SetScale(WhoGotLootsSavedData.SavedSize)
         WhoLootData.MainFrame.cursorFrame:SetScale(WhoGotLootsSavedData.SavedSize)
         WGLUIBuilder.WhisperEditor:SetScale(WhoGotLootsSavedData.SavedSize)
+        WGLUIBuilder.IDontNeedEditor:SetScale(WhoGotLootsSavedData.SavedSize)
 
         -- Parent all the item boxes to the main window.
         for i, frame in ipairs(WhoGotLootsFrames) do
@@ -49,8 +50,17 @@ function HandleEvents(self, event, ...)
         end
     elseif event == "CHAT_MSG_LOOT" then
 
+        -- Debug: Print all event arguments to understand the structure
+        WGLU.DebugPrint("CHAT_MSG_LOOT Debug - Total args: " .. #args)
+        for i = 1, #args do
+            WGLU.DebugPrint("  args[" .. i .. "] = " .. tostring(args[i]))
+        end
+
         -- Make sure we have an assosciated player.
-        if args[2] == nil or args[2] == "" then return end
+        if args[2] == nil or args[2] == "" then 
+            WGLU.DebugPrint("ERROR: No player name found in loot message. args[2] is nil or empty.")
+            return
+        end
 
         -- Scrape the message for item links. Item links look like "|cffffffff|Hitem:2589::::::::20:257::::::|h[Linen Cloth]|h|rx2.",
         local itemLinks = {}
@@ -61,6 +71,11 @@ function HandleEvents(self, event, ...)
         -- Only call AddLootFrame if exactly one item was detected
         if #itemLinks == 1 then
             AddLootFrame(args[2], itemLinks[1])
+        elseif #itemLinks > 1 then
+            WGLU.DebugPrint("WARNING: Multiple item links found in loot message. Only the first will be processed.")
+            AddLootFrame(args[2], itemLinks[1])
+        else
+            WGLU.DebugPrint("No item links found in loot message.")
         end
     end
 end
@@ -126,6 +141,15 @@ end
 -- Function to add a loot frame to the main window.
 function AddLootFrame(player, CompareItemLink)
 
+    -- Safety check for required variables
+    if not WGL_NumPooledFrames or not WhoGotLootsFrames then
+        WGLU.DebugPrint("ERROR: Frame pool not initialized. WGL_NumPooledFrames=" .. tostring(WGL_NumPooledFrames) .. ", WhoGotLootsFrames=" .. tostring(WhoGotLootsFrames ~= nil))
+        return
+    end
+
+    WGLU.DebugPrint("Processing loot for player: " .. tostring(player) .. ", item: " .. tostring(CompareItemLink))
+    WGLU.DebugPrint("Frame pool status: Active=" .. #WhoLootData.ActiveFrames .. ", Pool size=" .. WGL_NumPooledFrames .. ", Total frames=" .. (WhoGotLootsFrames and #WhoGotLootsFrames or "undefined"))
+
     -- Does the player name have their realm? Check for a -
     if string.find(player, "-") then player = string.match(player, "(.*)-") end
 
@@ -154,10 +178,52 @@ function AddLootFrame(player, CompareItemLink)
 
     -- If we've ran out of frames, remove the oldest one.
     if #WhoLootData.ActiveFrames >= WGL_NumPooledFrames then
-        local frame = WhoLootData.ActiveFrames
-        frame.InUse = false
-        frame.Frame:Hide()
-        table.remove(WhoLootData.ActiveFrames, 1)
+        local oldestFrame = WhoLootData.ActiveFrames[1]
+        if oldestFrame then
+            oldestFrame.InUse = false
+            oldestFrame:Hide()
+            table.remove(WhoLootData.ActiveFrames, 1)
+            WGLU.DebugPrint("Removed oldest frame to make room. Active frames: " .. #WhoLootData.ActiveFrames)
+        end
+    end
+
+    -- Additional safety check - if we still don't have available frames, force cleanup more frames
+    local availableFrames = 0
+    if WhoGotLootsFrames then
+        for i, f in ipairs(WhoGotLootsFrames) do
+            if f and not f.InUse then
+                availableFrames = availableFrames + 1
+            end
+        end
+    end
+    
+    -- If no frames available, force cleanup of multiple oldest frames
+    if availableFrames == 0 and #WhoLootData.ActiveFrames > 0 then
+        local framesToRemove = math.min(3, #WhoLootData.ActiveFrames) -- Remove up to 3 oldest frames
+        for i = 1, framesToRemove do
+            local oldFrame = WhoLootData.ActiveFrames[1]
+            if oldFrame then
+                oldFrame.InUse = false
+                oldFrame:Hide()
+                table.remove(WhoLootData.ActiveFrames, 1)
+            end
+        end
+        WGLU.DebugPrint("Force removed " .. framesToRemove .. " frames. Active frames now: " .. #WhoLootData.ActiveFrames)
+        
+        -- Recount available frames
+        availableFrames = 0
+        if WhoGotLootsFrames then
+            for i, f in ipairs(WhoGotLootsFrames) do
+                if f and not f.InUse then
+                    availableFrames = availableFrames + 1
+                end
+            end
+        end
+    end
+    
+    if availableFrames == 0 then
+        WGLU.DebugPrint("No available frames in pool after cleanup, skipping item")
+        return
     end
 
     if type(player) ~= "string" then player = tostring(player) end
@@ -434,10 +500,14 @@ function AddLootFrame(player, CompareItemLink)
 
         -- Look into the Frame Manager and find an available frame.
         local frame = nil
-        for i, f in ipairs(WhoGotLootsFrames) do
-            if not f.InUse then
-                frame = f
-                break
+        if WhoGotLootsFrames then
+            for i, f in ipairs(WhoGotLootsFrames) do
+                if f and not f.InUse then
+                    frame = f
+                    frame.InUse = true  -- Mark as in use immediately
+                    WGLU.DebugPrint("Found available frame #" .. i .. " for item")
+                    break
+                end
             end
         end
 
@@ -510,7 +580,7 @@ function AddLootFrame(player, CompareItemLink)
                 PlaySound(145739)
             end
         else
-            print("Who Got Loots ERROR: Couldn't find an available frame from pool. This shouldn't happen.")
+            WGLU.DebugPrint("ERROR: Couldn't find an available frame from pool. Active: " .. #WhoLootData.ActiveFrames .. ", Pool size: " .. (WGL_NumPooledFrames or "undefined") .. ", Available: " .. availableFrames)
         end
     end)
 end
@@ -561,12 +631,36 @@ function WhoLootData.SetupItemBoxFunctions(frame, itemLink, player)
             end
         end
         if button == "MiddleButton" then
-            local message = WhoGotLootsSavedData.WhisperMessage
-            local playerName = select(1, UnitName(player))
-            message = message:gsub("%%n", playerName)
-            message = message:gsub("%%i", itemLink)
+            -- Check if this is the player's own loot
+            if UnitIsUnit('player', player) or player == "player" then
+                -- This is our own loot - send "I don't need this" message to appropriate chat
+                local message = WhoGotLootsSavedData.IDontNeedMessage
+                message = message:gsub("%%i", itemLink)
+                
+                -- Determine which chat channel to use
+                local chatType = "SAY"  -- Default to local chat
+                
+                -- Check if we're in an instance group (dungeons, raids, etc.)
+                if IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then
+                    chatType = "INSTANCE_CHAT"
+                -- Check if we're in a regular party or raid
+                elseif IsInRaid() then
+                    chatType = "RAID"
+                elseif IsInGroup() then
+                    chatType = "PARTY"
+                end
+                
+                -- Send to the determined chat channel
+                SendChatMessage(message, chatType)
+            else
+                -- This is someone else's loot - send whisper message
+                local message = WhoGotLootsSavedData.WhisperMessage
+                local playerName = select(1, UnitName(player))
+                message = message:gsub("%%n", playerName)
+                message = message:gsub("%%i", itemLink)
 
-            SendChatMessage(message, "WHISPER", nil, UnitName(player))
+                SendChatMessage(message, "WHISPER", nil, UnitName(player))
+            end
         end
         if button == "RightButton" then
             WGLCache.RemoveRequest(frame.QueuedRequest)

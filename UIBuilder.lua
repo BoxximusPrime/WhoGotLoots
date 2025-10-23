@@ -1,8 +1,13 @@
 WGLUIBuilder = WGLUIBuilder or {}
 
 WGLUIBuilder.WhisperMsgMaxChars = 160
-WGLUIBuilder.DefaultWhisperMessage = "Greetings, %n! I sense you hold %i. If it does not align with your destiny, would you consider trading it? Many thanks!"
+WGLUIBuilder.DefaultWhisperMessage =
+"Greetings, %n! I sense you hold %i. If it does not align with your destiny, would you consider trading it? Many thanks!"
 WGLUIBuilder.TempWhisperMesage = ""
+
+WGLUIBuilder.IDontNeedMsgMaxChars = 160
+WGLUIBuilder.DefaultIDontNeedMessage = "I don't need %i if anyone wants it!"
+WGLUIBuilder.TempIDontNeedMessage = ""
 
 -- Add upgrade status constants
 WGLUIBuilder.UpgradeStatuses = {
@@ -13,7 +18,6 @@ WGLUIBuilder.UpgradeStatuses = {
 }
 
 function WGLUIBuilder.CreateMainFrame()
-
     -- Create the main frame.
     local mainFrame = CreateFrame("Frame", nil, UIParent)
     mainFrame:SetSize(130, 50)
@@ -71,9 +75,18 @@ function WGLUIBuilder.CreateMainFrame()
 
     -- Create an information tooltip to show when the info button is hovered.
     local tipWidth = 295
-    local tooltipText = "|cFFFFFFFFKey Bindings|r\n   - Double left click to equip the item (if it's your loot).\n   - Shift + left click to link the item in chat.\n   - Right click to dismiss the item.\n   - Alt + left click to try and inspect the player.\n   - Ctrl + left click to open trade with the person.\n   - Middle click to whisper them with the set whissper messsage in options.\n|CFFFFFFFFTips|r\n   - Rings and Trinket will compare to your lowest item level one."
+    local tooltipText = [[|cFFFFFFFFKey Bindings|r
+   - Double left click to equip the item (if it's your loot).
+   - Shift + left click to link the item in chat.
+   - Right click to dismiss the item.
+   - Alt + left click to try and inspect the player.
+   - Ctrl + left click to open trade with the person.
+   - Middle click someone else's item to whisper them.
+   - Middle click your own item to announce you don't need it.
+|CFFFFFFFFTips|r
+   - Rings and Trinket will compare to your lowest item level one.]]
     mainFrame.infoTooltip = CreateFrame("Frame", nil, UIParent)
-    mainFrame.infoTooltip:SetSize(tipWidth, 900)
+    mainFrame.infoTooltip:SetSize(tipWidth, 1200)
     mainFrame.infoTooltip:SetPoint("TOP", mainFrame, "TOP", 0, -mainFrame:GetHeight() + 16)
     mainFrame.infoTooltip:SetFrameLevel(mainFrame:GetFrameLevel() + 10)
     mainFrame.infoTooltip.Text = mainFrame.infoTooltip:CreateFontString(nil, "OVERLAY", "WGLFont_Tooltip")
@@ -82,9 +95,8 @@ function WGLUIBuilder.CreateMainFrame()
     mainFrame.infoTooltip.Text:SetJustifyV("TOP")
     mainFrame.infoTooltip.Text:SetSpacing(3)
     mainFrame.infoTooltip.Text:SetText(tooltipText)
-    --mainFrame.infoTooltip.Text:SetHeight(mainFrame.infoTooltip.Text:GetStringHeight() + 35)
     mainFrame.infoTooltip.Text:SetHeight(127)
-    mainFrame.infoTooltip:SetHeight(mainFrame.infoTooltip.Text:GetHeight())
+    mainFrame.infoTooltip:SetHeight(mainFrame.infoTooltip.Text:GetHeight() + 10)
     mainFrame.infoTooltip:SetWidth(mainFrame.infoTooltip.Text:GetWidth() + 10)
     mainFrame.infoTooltip:Hide()
 
@@ -134,7 +146,6 @@ function WGLUIBuilder.CreateMainFrame()
 
     -- Animations And Events
     mainFrame.cursorFrame:SetScript("OnUpdate", function(self, elapsed)
-
         -- If the frame is not visible, don't bother with the rest of the code.
         if not WhoLootData.MainFrame:IsVisible() then return end
 
@@ -211,7 +222,7 @@ function WGLUIBuilder.CreateMainFrame()
         if not newItemLevel or not equippedItemLevel then
             return WGLUIBuilder.UpgradeStatuses.UNKNOWN
         end
-        
+
         local difference = newItemLevel - equippedItemLevel
         if difference > 0 then
             return string.format(WGLUIBuilder.UpgradeStatuses.UPGRADE, math.abs(difference)), true
@@ -224,10 +235,9 @@ function WGLUIBuilder.CreateMainFrame()
 
     -- Add method to set item upgrade status on item frames
     function mainFrame:SetItemUpgradeStatus(request, theirItemLevel)
-
         -- We compare the dropped item level to their item level for the comparison text
         local upgradeText, IsUpgradeForThem = self:CompareItemLevels(request.ItemLevel, theirItemLevel)
-        
+
         -- Show glow if they have a higher item level AND it would be an upgrade for us
         if request.IsUpgrade and not IsUpgradeForThem and request.GoodForPlayer then
             request.Frame:ShowUpgradeGlow()
@@ -238,7 +248,7 @@ function WGLUIBuilder.CreateMainFrame()
         else
             request.Frame:HideUpgradeGlow()
         end
-        
+
         return upgradeText
     end
 
@@ -268,7 +278,8 @@ function WGLUIBuilder.CreateMainFrame()
 
     -- Set tip text
     mainFrame.WhisperWindow.Tip = mainFrame.WhisperWindow:CreateFontString(nil, "OVERLAY", "WGLFont_Tooltip")
-    mainFrame.WhisperWindow.Tip:SetText("Set your custom message here. Use %n for the player's name, and %i for the item name.")
+    mainFrame.WhisperWindow.Tip:SetText(
+        "Set your custom message here. Use %n for the player's name, and %i for the item name.")
     mainFrame.WhisperWindow.Tip:SetPoint("TOP", mainFrame.WhisperWindow.Title, "BOTTOM", 0, -10)
 
     -- Create a "Set to default" button
@@ -306,7 +317,7 @@ function WGLUIBuilder.CreateMainFrame()
 
     -- Create some text below the input box showing the number of available characters.
     local charCount = mainFrame.WhisperWindow.EditBox:CreateFontString(nil, "OVERLAY", "WGLFont_Tooltip")
-    charCount:SetPoint("BOTTOMRIGHT", mainFrame.WhisperWindow.EditBox, "BOTTOMRIGHT",  0, 0)
+    charCount:SetPoint("BOTTOMRIGHT", mainFrame.WhisperWindow.EditBox, "BOTTOMRIGHT", 0, 0)
     charCount:SetText(WGLUIBuilder.WhisperMsgMaxChars .. " characters remaining")
 
     -- Update the character count whenever the text changes.
@@ -356,21 +367,22 @@ function WGLUIBuilder.CreateMainFrame()
     mainFrame.WhisperWindow.savedText:SetVertexColor(0.6196, 0.8627, 0.549, 1)
     mainFrame.WhisperWindow.SavedTextFrame.AnimDelta = 0
     mainFrame.WhisperWindow.SavedTextFrame.AnimTimer = nil
-    
+
     function mainFrame.WhisperWindow:ShowSavedText()
         -- Make the SavedTextFrame slide from behind the save button, and fade in.
         self.SavedTextFrame:Show()
         self.SavedTextFrame.AnimDelta = 0
-    
+
         -- Cancel any onupdate scripts that are running.
         if WhoLootData.MainFrame.WhisperWindow.SavedTextFrame.AnimTimer then
             self.SavedTextFrame.AnimTimer:Cancel()
             self.SavedTextFrame.AnimTimer = nil
         end
-    
+
         self.SavedTextFrame:SetScript("OnUpdate", function(self, elapsed)
             self.AnimDelta = WGLU.Clamp(self.AnimDelta + elapsed * 5, 0, 1)
-            self:SetPoint("RIGHT", WhoLootData.MainFrame.WhisperWindow.SaveBtn, "LEFT", WGLU.LerpFloat(60, -4, math.sin(self.AnimDelta * 1.57)), 0)
+            self:SetPoint("RIGHT", WhoLootData.MainFrame.WhisperWindow.SaveBtn, "LEFT",
+                WGLU.LerpFloat(60, -4, math.sin(self.AnimDelta * 1.57)), 0)
             self:SetAlpha(self.AnimDelta)
             if self.AnimDelta == 1 then
                 self:SetScript("OnUpdate", nil) -- Stop the slide-in animation
@@ -389,7 +401,6 @@ function WGLUIBuilder.CreateMainFrame()
             end
         end)
     end
-    
 
     -- Close Button
     local tipCloseBtn = CreateFrame("Button", nil, WGLUIBuilder.WhisperEditor, "WGLCloseBtn")
@@ -400,9 +411,168 @@ function WGLUIBuilder.CreateMainFrame()
         WGLUIBuilder.WhisperEditor:Hide()
     end)
 
+    -- ====================================================================
+    -- CREATE "I DON'T NEED THIS" MESSAGE EDITOR
+    -- ====================================================================
+
+    -- Create the "I Don't Need This" message editor window
+    mainFrame.IDontNeedWindow = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    mainFrame.IDontNeedWindow:SetSize(360, 140)
+    mainFrame.IDontNeedWindow:SetPoint("CENTER", 0, 0)
+    mainFrame.IDontNeedWindow:SetFrameLevel(10)
+    mainFrame.IDontNeedWindow:EnableMouse(true)
+    mainFrame.IDontNeedWindow:Hide()
+
+    -- Draw background and border
+    WGLUIBuilder.DrawSlicedBG(mainFrame.IDontNeedWindow, "OptionsWindowBG", "backdrop", 6)
+    WGLUIBuilder.ColorBGSlicedFrame(mainFrame.IDontNeedWindow, "backdrop", 1, 1, 1, 1)
+    mainFrame.IDontNeedWindow.Border = CreateFrame("Frame", nil, mainFrame.IDontNeedWindow)
+    mainFrame.IDontNeedWindow.Border:SetAllPoints()
+    WGLUIBuilder.DrawSlicedBG(mainFrame.IDontNeedWindow.Border, "EdgedBorder", "border", 6)
+    WGLUIBuilder.ColorBGSlicedFrame(mainFrame.IDontNeedWindow.Border, "border", 0.7, 0.7, 0.7, 1)
+
+    -- Title text
+    mainFrame.IDontNeedWindow.Title = mainFrame.IDontNeedWindow:CreateFontString(nil, "OVERLAY", "WGLFont_Title")
+    mainFrame.IDontNeedWindow.Title:SetText("I Don't Need This Message")
+    mainFrame.IDontNeedWindow.Title:SetPoint("TOP", mainFrame.IDontNeedWindow, "TOP", 0, -15)
+
+    -- Set tip text
+    mainFrame.IDontNeedWindow.Tip = mainFrame.IDontNeedWindow:CreateFontString(nil, "OVERLAY", "WGLFont_Tooltip")
+    mainFrame.IDontNeedWindow.Tip:SetText("Set your custom message here. Use %i for the item name.")
+    mainFrame.IDontNeedWindow.Tip:SetPoint("TOP", mainFrame.IDontNeedWindow.Title, "BOTTOM", 0, -10)
+
+    -- Create a "Set to default" button
+    mainFrame.IDontNeedWindow.DefaultBtn = CreateFrame("Button", nil, mainFrame.IDontNeedWindow, "WGLGeneralButton")
+    mainFrame.IDontNeedWindow.DefaultBtn:SetPoint("BOTTOMLEFT", mainFrame.IDontNeedWindow, "BOTTOMLEFT", 18, 18)
+    mainFrame.IDontNeedWindow.DefaultBtn:SetSize(70, 14)
+    mainFrame.IDontNeedWindow.DefaultBtn:SetText("Set to Default")
+    mainFrame.IDontNeedWindow.DefaultBtn:SetScript("OnClick", function(self)
+        mainFrame.IDontNeedWindow.EditBox:SetText(WGLUIBuilder.DefaultIDontNeedMessage)
+        PlaySound(856)
+    end)
+
+    -- Create edit box
+    mainFrame.IDontNeedWindow.EditBox = CreateFrame("EditBox", nil, mainFrame.IDontNeedWindow, "InputBoxTemplate")
+    mainFrame.IDontNeedWindow.EditBox:SetWidth(mainFrame.IDontNeedWindow:GetWidth() - 50)
+    mainFrame.IDontNeedWindow.EditBox:SetMultiLine(true)
+    mainFrame.IDontNeedWindow.EditBox:SetMaxLetters(WGLUIBuilder.IDontNeedMsgMaxChars)
+    mainFrame.IDontNeedWindow.EditBox:SetAutoFocus(false)
+    mainFrame.IDontNeedWindow.EditBox:SetPoint("TOP", mainFrame.IDontNeedWindow.Tip, "BOTTOM", 0, -15)
+    mainFrame.IDontNeedWindow.EditBox:SetPoint("BOTTOM", mainFrame.IDontNeedWindow.DefaultBtn, "TOP", 0, 18)
+    mainFrame.IDontNeedWindow.EditBox:SetFontObject("WGLFont_Item_StatBottomText")
+    mainFrame.IDontNeedWindow.EditBox:SetText("Message here")
+    mainFrame.IDontNeedWindow.EditBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    mainFrame.IDontNeedWindow.EditBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+
+    -- Hide the background and border of the edit box.
+    mainFrame.IDontNeedWindow.EditBox.Left:Hide()
+    mainFrame.IDontNeedWindow.EditBox.Middle:Hide()
+    mainFrame.IDontNeedWindow.EditBox.Right:Hide()
+
+    WGLUIBuilder.DrawSlicedBG(mainFrame.IDontNeedWindow.EditBox, "OptionsWindowBG", "backdrop", -8)
+    WGLUIBuilder.ColorBGSlicedFrame(mainFrame.IDontNeedWindow.EditBox, "backdrop", 1, 1, 1, 0.95)
+    WGLUIBuilder.DrawSlicedBG(mainFrame.IDontNeedWindow.EditBox, "EdgedBorder", "border", -9)
+    WGLUIBuilder.ColorBGSlicedFrame(mainFrame.IDontNeedWindow.EditBox, "border", 0.3, 0.3, 0.3, 1)
+
+    -- Create some text below the input box showing the number of available characters.
+    local idontNeedCharCount = mainFrame.IDontNeedWindow.EditBox:CreateFontString(nil, "OVERLAY", "WGLFont_Tooltip")
+    idontNeedCharCount:SetPoint("BOTTOMRIGHT", mainFrame.IDontNeedWindow.EditBox, "BOTTOMRIGHT", 0, 0)
+    idontNeedCharCount:SetText(WGLUIBuilder.IDontNeedMsgMaxChars .. " characters remaining")
+
+    -- Update the character count whenever the text changes.
+    mainFrame.IDontNeedWindow.EditBox:SetScript("OnTextChanged", function(self)
+        WGLUIBuilder.TempIDontNeedMessage = self:GetText()
+        local remaining = WGLUIBuilder.IDontNeedMsgMaxChars - self:GetNumLetters()
+        idontNeedCharCount:SetText(remaining .. " characters remaining")
+
+        -- If the remaining is less than 40, color the text a dark red.
+        if remaining < 40 then
+            idontNeedCharCount:SetTextColor(0.7098, 0.2588, 0.2588, 1)
+        else
+            idontNeedCharCount:SetTextColor(0.65, 0.65, 0.65, 1)
+        end
+
+        -- If the text is different than the saved text, change the text color of the save button.
+        mainFrame.IDontNeedWindow.SaveBtn:SetEnabled(WGLUIBuilder.TempIDontNeedMessage ~=
+            WhoGotLootsSavedData.IDontNeedMessage)
+    end)
+    WGLUIBuilder.IDontNeedEditor = mainFrame.IDontNeedWindow
+
+    -- Create a "Save" button
+    mainFrame.IDontNeedWindow.SaveBtn = CreateFrame("Button", nil, mainFrame.IDontNeedWindow.EditBox, "WGLGeneralButton")
+    mainFrame.IDontNeedWindow.SaveBtn:SetPoint("BOTTOMRIGHT", mainFrame.IDontNeedWindow, "BOTTOMRIGHT", -18, 18)
+    mainFrame.IDontNeedWindow.SaveBtn:SetSize(70, 14)
+    mainFrame.IDontNeedWindow.SaveBtn:SetText("Save")
+    mainFrame.IDontNeedWindow.SaveBtn:SetScript("OnClick", function(self)
+        if mainFrame.IDontNeedWindow.SaveBtn:IsEnabled() == false then return end
+        WhoGotLootsSavedData.IDontNeedMessage = WGLUIBuilder.TempIDontNeedMessage
+        mainFrame.IDontNeedWindow:ShowSavedText()
+        mainFrame.IDontNeedWindow.SaveBtn:SetEnabled(false)
+        WhoLootsOptionsFrame.idontNeedPreview:SetText(WGLUIBuilder.TempIDontNeedMessage)
+        PlaySound(856)
+    end)
+    mainFrame.IDontNeedWindow.SaveBtn:SetEnabled(false)
+
+    -- Create a frame for the saved message text, so we can move it around.
+    mainFrame.IDontNeedWindow.SavedTextFrame = CreateFrame("Frame", nil, mainFrame.IDontNeedWindow)
+    mainFrame.IDontNeedWindow.SavedTextFrame:SetSize(200, 20)
+    mainFrame.IDontNeedWindow.SavedTextFrame:SetPoint("RIGHT", mainFrame.IDontNeedWindow.SaveBtn, "LEFT", -4, 0)
+    mainFrame.IDontNeedWindow.SavedTextFrame:Hide()
+
+    -- Create some text that says "saved" when the message is saved.
+    mainFrame.IDontNeedWindow.savedText = mainFrame.IDontNeedWindow:CreateFontString(nil, "OVERLAY", "WGLFont_Checkbox")
+    mainFrame.IDontNeedWindow.savedText:SetPoint("RIGHT", mainFrame.IDontNeedWindow.SavedTextFrame, "RIGHT", -9, 0)
+    mainFrame.IDontNeedWindow.savedText:SetText("Message saved")
+    mainFrame.IDontNeedWindow.savedText:SetParent(mainFrame.IDontNeedWindow.SavedTextFrame)
+    mainFrame.IDontNeedWindow.savedText:SetVertexColor(0.6196, 0.8627, 0.549, 1)
+    mainFrame.IDontNeedWindow.SavedTextFrame.AnimDelta = 0
+    mainFrame.IDontNeedWindow.SavedTextFrame.AnimTimer = nil
+
+    function mainFrame.IDontNeedWindow:ShowSavedText()
+        -- Make the SavedTextFrame slide from behind the save button, and fade in.
+        self.SavedTextFrame:Show()
+        self.SavedTextFrame.AnimDelta = 0
+
+        -- Cancel any onupdate scripts that are running.
+        if WhoLootData.MainFrame.IDontNeedWindow.SavedTextFrame.AnimTimer then
+            self.SavedTextFrame.AnimTimer:Cancel()
+            self.SavedTextFrame.AnimTimer = nil
+        end
+
+        self.SavedTextFrame:SetScript("OnUpdate", function(self, elapsed)
+            self.AnimDelta = WGLU.Clamp(self.AnimDelta + elapsed * 5, 0, 1)
+            self:SetPoint("RIGHT", WhoLootData.MainFrame.IDontNeedWindow.SaveBtn, "LEFT",
+                WGLU.LerpFloat(60, -4, math.sin(self.AnimDelta * 1.57)), 0)
+            self:SetAlpha(self.AnimDelta)
+            if self.AnimDelta == 1 then
+                self:SetScript("OnUpdate", nil) -- Stop the slide-in animation
+                -- Delay the fade out by 1 second.
+                WhoLootData.MainFrame.IDontNeedWindow.SavedTextFrame.AnimTimer = C_Timer.NewTimer(1, function()
+                    self:SetScript("OnUpdate", function(self, elapsed)
+                        self.AnimDelta = WGLU.Clamp(self.AnimDelta - elapsed * 2, 0, 1)
+                        self:SetAlpha(math.sin(self.AnimDelta * 1.57))
+                        if self.AnimDelta == 0 then
+                            self:Hide()
+                            self:SetScript("OnUpdate", nil)
+                            WhoLootData.MainFrame.IDontNeedWindow.SavedTextFrame.AnimTimer = nil
+                        end
+                    end)
+                end)
+            end
+        end)
+    end
+
+    -- Close Button for IDontNeedEditor
+    local idontNeedCloseBtn = CreateFrame("Button", nil, WGLUIBuilder.IDontNeedEditor, "WGLCloseBtn")
+    idontNeedCloseBtn:SetPoint("TOPRIGHT", WGLUIBuilder.IDontNeedEditor, "TOPRIGHT", -12, -12)
+    idontNeedCloseBtn:SetSize(12, 12)
+    idontNeedCloseBtn:SetScript("OnClick", function(self)
+        PlaySound(856)
+        WGLUIBuilder.IDontNeedEditor:Hide()
+    end)
+
     return mainFrame
 end
-
 
 FrameTextures =
 {
@@ -469,8 +639,8 @@ FrameTextures =
 WGLUIBuilder.Templates = {
     StatFrame = {
         size = { height = 12 },
-        padding = 2, -- Added padding between frames
-        minWidth = 25, -- Minimum width for very short stats
+        padding = 2,     -- Added padding between frames
+        minWidth = 25,   -- Minimum width for very short stats
         textPadding = 1, -- Padding on either side of text
         background = {
             texture = "ItemStatBG",
@@ -493,7 +663,6 @@ WGLUIBuilder.Templates = {
 
 -- Add these new functions
 function WGLUIBuilder.CreateStatFrame(parent, width, text, color)
-
     local template = WGLUIBuilder.Templates.StatFrame
     local frame
 
@@ -542,7 +711,7 @@ function WGLUIBuilder.CreateStatFrame(parent, width, text, color)
 
     -- Update text
     text = text:gsub("(%S+)", function(word)
-        return word:sub(1,1):upper() .. word:sub(2)
+        return word:sub(1, 1):upper() .. word:sub(2)
     end)
     frame.text:SetText(text)
 
@@ -582,7 +751,6 @@ function WGLUIBuilder.CreateStatFrame(parent, width, text, color)
 end
 
 function WGLUIBuilder.AddStatToBreakdown(parentFrame, text, position, color, indexOffset, container)
-
     container = container or "secondary" -- Default to primary if not specified
 
     if not parentFrame.statContainer or not parentFrame.statContainer[container] then
@@ -597,13 +765,13 @@ function WGLUIBuilder.AddStatToBreakdown(parentFrame, text, position, color, ind
         WGLUIBuilder.measureText = UIParent:CreateFontString(nil, "OVERLAY")
         WGLUIBuilder.measureText:SetFontObject(WGLUIBuilder.Templates.StatFrame.text.font)
     end
-    
+
     -- Measure text width
     WGLUIBuilder.measureText:SetText(text)
     local width = WGLUIBuilder.measureText:GetStringWidth()
     local template = WGLUIBuilder.Templates.StatFrame
     width = math.max(width + template.textPadding * 2, template.minWidth)
-    
+
     -- Create the new stat frame
     local frame = WGLUIBuilder.CreateStatFrame(
         parentFrame.statContainer[container],
@@ -619,7 +787,7 @@ function WGLUIBuilder.AddStatToBreakdown(parentFrame, text, position, color, ind
     else
         insertIndex = indexOffset and #containerFrame + 1 - indexOffset or #containerFrame + 1
     end
-    
+
     -- Ensure insert index is within bounds
     insertIndex = math.max(1, math.min(insertIndex, #containerFrame + 1))
     table.insert(containerFrame, insertIndex, frame)
@@ -632,7 +800,7 @@ function WGLUIBuilder.AddStatToBreakdown(parentFrame, text, position, color, ind
 
     for _, existingFrame in ipairs(containerFrame.frames) do
         local frameWidth = existingFrame:GetWidth()
-        
+
         -- Check if this frame would overflow the row
         if xOffset + frameWidth > maxWidth then
             xOffset = 0
@@ -643,13 +811,13 @@ function WGLUIBuilder.AddStatToBreakdown(parentFrame, text, position, color, ind
         existingFrame:SetPoint("TOPLEFT", parentFrame.statContainer[container], "TOPLEFT", xOffset, -yOffset)
         xOffset = xOffset + frameWidth + template.padding
     end
-    
+
     -- Update container height
     parentFrame.statContainer[container]:SetHeight(yOffset + rowHeight + template.padding)
-    
+
     -- Update container positions and parent frame height
     WGLUIBuilder.UpdateContainerPositions(parentFrame)
-    
+
     return frame
 end
 
@@ -670,7 +838,6 @@ function WGLUIBuilder.ClearStatContainer(parentFrame)
 end
 
 function WGLUIBuilder.CreateStatBreakdownFrames(parentFrame, bottomText)
-
     -- Clear everything first
     WGLUIBuilder.ClearStatContainer(parentFrame)
 
@@ -678,16 +845,14 @@ function WGLUIBuilder.CreateStatBreakdownFrames(parentFrame, bottomText)
     for _, text in ipairs(bottomText) do
         WGLUIBuilder.AddStatToBreakdown(parentFrame, text, "append", nil, nil, "secondary")
     end
-
 end
 
 -- Add this new function after CreateStatBreakdownFrames
 function WGLUIBuilder.UpdateContainerPositions(parentFrame)
-
     -- Push the secondary down below the primary
     parentFrame.statContainer.secondary:SetPoint("TOPLEFT", parentFrame.statContainer.primary, "BOTTOMLEFT", 0, 0)
     parentFrame.statContainer.secondary:SetPoint("TOPRIGHT", parentFrame.statContainer.primary, "BOTTOMRIGHT", 0, 0)
-    
+
     local totalFrameHeight =
         (parentFrame.statContainer.primary:IsShown() and parentFrame.statContainer.primary:GetHeight() or 0) +
         (parentFrame.statContainer.secondary:IsShown() and parentFrame.statContainer.secondary:GetHeight() or 0)
@@ -724,7 +889,7 @@ function WGLUIBuilder.DrawSlicedBG(frame, textureKey, layer, shrink)
     local file = "Interface\\AddOns\\WhoGotLoots\\Art\\" .. data.file;
     local cornerSize = data.cornerSize;
     local coord = data.cornerCoord;
-    local buildOrder = {1, 3, 7, 9, 2, 4, 6, 8, 5};
+    local buildOrder = { 1, 3, 7, 9, 2, 4, 6, 8, 5 };
     local tex, key;
 
     for i = 1, 9 do
@@ -739,27 +904,26 @@ function WGLUIBuilder.DrawSlicedBG(frame, textureKey, layer, shrink)
             if key == 2 then
                 tex:SetPoint("TOPLEFT", group[1], "TOPRIGHT", 0, 0);
                 tex:SetPoint("BOTTOMRIGHT", group[3], "BOTTOMLEFT", 0, 0);
-                tex:SetTexCoord(coord, 1-coord, 0, coord);
+                tex:SetTexCoord(coord, 1 - coord, 0, coord);
             else
                 tex:SetPoint("TOPLEFT", group[7], "TOPRIGHT", 0, 0);
                 tex:SetPoint("BOTTOMRIGHT", group[9], "BOTTOMLEFT", 0, 0);
-                tex:SetTexCoord(coord, 1-coord, 1-coord, 1);
+                tex:SetTexCoord(coord, 1 - coord, 1 - coord, 1);
             end
         elseif key == 4 or key == 6 then
             if key == 4 then
                 tex:SetPoint("TOPLEFT", group[1], "BOTTOMLEFT", 0, 0);
                 tex:SetPoint("BOTTOMRIGHT", group[7], "TOPRIGHT", 0, 0);
-                tex:SetTexCoord(0, coord, coord, 1-coord);
+                tex:SetTexCoord(0, coord, coord, 1 - coord);
             else
                 tex:SetPoint("TOPLEFT", group[3], "BOTTOMLEFT", 0, 0);
                 tex:SetPoint("BOTTOMRIGHT", group[9], "TOPRIGHT", 0, 0);
-                tex:SetTexCoord(1-coord, 1, coord, 1-coord);
+                tex:SetTexCoord(1 - coord, 1, coord, 1 - coord);
             end
         elseif key == 5 then
             tex:SetPoint("TOPLEFT", group[1], "BOTTOMRIGHT", 0, 0);
             tex:SetPoint("BOTTOMRIGHT", group[9], "TOPLEFT", 0, 0);
-            tex:SetTexCoord(coord, 1-coord, coord, 1-coord);
-
+            tex:SetTexCoord(coord, 1 - coord, coord, 1 - coord);
         else
             tex:SetSize(cornerSize, cornerSize);
             if key == 1 then
@@ -767,20 +931,19 @@ function WGLUIBuilder.DrawSlicedBG(frame, textureKey, layer, shrink)
                 tex:SetTexCoord(0, coord, 0, coord);
             elseif key == 3 then
                 tex:SetPoint("CENTER", frame, "TOPRIGHT", -shrink, -shrink);
-                tex:SetTexCoord(1-coord, 1, 0, coord);
+                tex:SetTexCoord(1 - coord, 1, 0, coord);
             elseif key == 7 then
                 tex:SetPoint("CENTER", frame, "BOTTOMLEFT", shrink, shrink);
-                tex:SetTexCoord(0, coord, 1-coord, 1);
+                tex:SetTexCoord(0, coord, 1 - coord, 1);
             elseif key == 9 then
                 tex:SetPoint("CENTER", frame, "BOTTOMRIGHT", -shrink, shrink);
-                tex:SetTexCoord(1-coord, 1, 1-coord, 1);
+                tex:SetTexCoord(1 - coord, 1, 1 - coord, 1);
             end
         end
     end
 end
 
 function WGLUIBuilder.ColorBGSlicedFrame(frame, layer, r, g, b, a)
-
     if layer == "backdrop" then
         if frame.backdropTextures then
             for _, tex in pairs(frame.backdropTextures) do

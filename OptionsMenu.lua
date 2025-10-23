@@ -50,6 +50,14 @@ function WhoLootsOptionsEntries.LoadOptions()
         WGLUIBuilder.WhisperEditor.EditBox:SetText(WGLUIBuilder.DefaultWhisperMessage)
     end
 
+    -- Set default "I don't need this" message if not set
+    if WhoGotLootsSavedData.IDontNeedMessage == nil then
+        WhoGotLootsSavedData.IDontNeedMessage = WGLUIBuilder.DefaultIDontNeedMessage
+    end
+    
+    WhoLootsOptionsFrame.idontNeedPreview:SetText(WhoGotLootsSavedData.IDontNeedMessage)
+    WGLUIBuilder.IDontNeedEditor.EditBox:SetText(WhoGotLootsSavedData.IDontNeedMessage)
+
     -- Set the minimum item quality text color
     local r, g, b, hex = C_Item.GetItemQualityColor(WhoGotLootsSavedData.MinQuality)
     WhoLootsOptionsEntries.MinQualitySlider.KeyLabel:SetText(WGLU.ItemQualityToText(WhoGotLootsSavedData.MinQuality))
@@ -157,13 +165,35 @@ whisperMessageBtn:SetScript("OnClick", function(self)
     PlaySound(170827)
 end)
 
+-- Create a title for the "I don't need this" message
+local idontNeedTitle = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_Checkbox")
+idontNeedTitle:SetPoint("TOPLEFT", whisperMessageBtn, "BOTTOMLEFT", 0, -16)
+idontNeedTitle:SetText("I Don't Need This Message")
+
+-- Create a preview of the "I don't need this" message
+WhoLootsOptionsFrame.idontNeedPreview = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+WhoLootsOptionsFrame.idontNeedPreview:SetPoint("TOPLEFT", idontNeedTitle, "BOTTOMLEFT", 0, -6)
+WhoLootsOptionsFrame.idontNeedPreview:SetText(WGLUIBuilder.DefaultIDontNeedMessage)
+WhoLootsOptionsFrame.idontNeedPreview:SetJustifyH("LEFT")
+WhoLootsOptionsFrame.idontNeedPreview:SetWidth(scrollFrame:GetWidth() - 20)
+
+-- Set "I Don't Need This" Message Button
+local idontNeedMessageBtn = CreateFrame("Button", nil, contentFrame, "WGLGeneralButton")
+idontNeedMessageBtn:SetText("Set Message")
+idontNeedMessageBtn:SetPoint("TOPLEFT", WhoLootsOptionsFrame.idontNeedPreview, "BOTTOMLEFT", 0, -6)
+idontNeedMessageBtn:SetSize(110, 16)
+idontNeedMessageBtn:SetScript("OnClick", function(self)
+    WGLUIBuilder.IDontNeedEditor:Show()
+    PlaySound(170827)
+end)
+
 
 -- Checkbox: Auto Close Window
 local autoClose = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(autoClose, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.AutoCloseOnEmpty = tick; end)
 autoClose:SetText("Auto Close")
 autoClose:SetParent(contentFrame)
-autoClose:SetPoint("TOPLEFT", whisperMessageBtn, "BOTTOMLEFT", 0, -16)
+autoClose:SetPoint("TOPLEFT", idontNeedMessageBtn, "BOTTOMLEFT", 0, -16)
 WhoLootsOptionsEntries.AutoClose = autoClose
 -- Option text
 local autoClose_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
@@ -333,7 +363,7 @@ scaleSlider.KeyLabel2:SetText("2.0")
 
 
 -- Now, set the content frame size
-contentFrame:SetSize(260, 430)
+contentFrame:SetSize(260, 480)
 
 -- Show the version number at the bottom right of the options frame.
 local version = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_VersNum")
@@ -348,6 +378,7 @@ scaleSlider:SetScript("OnMouseUp", function(self, button)
     WhoLootData.MainFrame.infoTooltip:SetScale(value)
     WhoLootData.MainFrame.cursorFrame:SetScale(value)
     WGLUIBuilder.WhisperEditor:SetScale(value)
+    WGLUIBuilder.IDontNeedEditor:SetScale(value)
 end)
 WhoLootsOptionsEntries.ScaleSlider = scaleSlider
 
