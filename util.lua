@@ -1,22 +1,16 @@
 WGLU = {}
 WGLU.DebugMode = false
 
- function WGLU.GetPlayerMainStat()
-    local stats = {
-        Strength = { base = 0, effective = 0 },
-        Agility = { base = 0, effective = 0 },
-        Intellect = { base = 0, effective = 0 }
-    }
+function WGLU.GetPlayerMainStat()
+    local specialization = C_SpecializationInfo.GetSpecialization()
+    if not specialization then return nil end
 
-    stats.Strength.base, stats.Strength.effective = UnitStat("player", 1)
-    stats.Agility.base, stats.Agility.effective = UnitStat("player", 2)
-    stats.Intellect.base, stats.Intellect.effective = UnitStat("player", 4)
-
-    if stats.Strength.effective > stats.Agility.effective and stats.Strength.effective > stats.Intellect.effective then
+    local primaryStat = select(6, C_SpecializationInfo.GetSpecializationInfo(specialization))
+    if primaryStat == 1 then
         return "Strength"
-    elseif stats.Agility.effective > stats.Strength.effective and stats.Agility.effective > stats.Intellect.effective then
+    elseif primaryStat == 2 then
         return "Agility"
-    elseif stats.Intellect.effective > stats.Strength.effective and stats.Intellect.effective > stats.Agility.effective then
+    elseif primaryStat == 4 then
         return "Intellect"
     end
 end
@@ -126,23 +120,59 @@ function WGLU.GetPlayerGUID(playerName)
 end
 
 function WGLU.GetPlayerUnitByGUID(guid)
-  if UnitExists("target") and UnitGUID("target") == guid then
-    return "target"
+  if not guid then return nil end
+  return UnitTokenFromGUID(guid)
+end
+
+function WGLU.GetPlayerUnitByName(playerName)
+  if issecretvalue and issecretvalue(playerName) then return nil end
+  if not playerName then return nil end
+  if UnitExists(playerName) then return playerName end
+
+  local function NormalizeName(name)
+    return name and string.lower(name) or nil
   end
 
-  for i = 1, 4 do
-    local unit = "party" .. i
-    if UnitExists(unit) and UnitGUID(unit) == guid then
-      return unit
+  local function NormalizeRealm(realm)
+    return realm and string.lower((string.gsub(realm, "[%s%-']", ""))) or nil
+  end
+
+  local incomingName, incomingRealm = string.match(playerName, "^([^%-]+)%-(.+)$")
+  incomingName = NormalizeName(incomingName or playerName)
+  incomingRealm = NormalizeRealm(incomingRealm)
+
+  local function MatchesPlayer(unit)
+    if not UnitExists(unit) then return false end
+
+    local unitName, unitRealm = UnitFullName(unit)
+    if (issecretvalue and (issecretvalue(unitName) or issecretvalue(unitRealm))) or not unitName then return false end
+
+    unitName = NormalizeName(unitName)
+    unitRealm = NormalizeRealm(unitRealm or GetNormalizedRealmName())
+
+    if unitName ~= incomingName then return false end
+
+    -- Same-realm loot messages are not consistent about including the realm.
+    if not incomingRealm then return true end
+    return unitRealm == incomingRealm
+
+  end
+
+  if MatchesPlayer("player") then return "player" end
+
+  if IsInRaid() then
+    for i = 1, GetNumGroupMembers() do
+      local unit = "raid" .. i
+      if MatchesPlayer(unit) then return unit end
+    end
+  else
+    for i = 1, GetNumSubgroupMembers() do
+      local unit = "party" .. i
+      if MatchesPlayer(unit) then return unit end
     end
   end
 
-  for i = 1, 40 do
-    local unit = "raid" .. i
-    if UnitExists(unit) and UnitGUID(unit) == guid then
-      return unit
-    end
-  end
+  return nil
 end
 
 function WGLU.DebugPrint(message)
@@ -152,6 +182,8 @@ end
 -- Determine if an item has the specified mainstat.
 -- mainstat is a string, either "agility", "strength", or "intellect"
 function WGLU.ItemHasMainStat(itemLink, mainStat)
+  -- A character without a selected specialization has no primary stat yet.
+  if not mainStat then return true end
 
   -- If the item is a neck, ring, or trinket, it doesn't have a main stat.
   local itemType = select(9, C_Item.GetItemInfo(itemLink))

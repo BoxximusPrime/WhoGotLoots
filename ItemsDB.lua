@@ -2,13 +2,13 @@ WGLItemsDB = {}
 local _, playerclass = UnitClass("player")
 
 -- Can the player equip this at all?
-function WGLItemsDB.CanEquip(item, class)
-    return WGLItemsDB.IsAppropriate(item, class) ~= nil
+function WGLItemsDB.CanEquip(item, class, specID)
+    return WGLItemsDB.IsAppropriate(item, class, specID) ~= nil
 end
 
 -- Is the item "appropriate", per transmog rules -- i.e. is it equipable and of the primary armor-type
 -- TODO: class-restricted items, offhand-restricted items?
-function WGLItemsDB.IsAppropriate(item, class)
+function WGLItemsDB.IsAppropriate(item, class, specID)
     class = class or playerclass
     local slot, _, itemclass, itemsubclass = select(4, C_Item.GetItemInfoInstant(item))
 
@@ -22,9 +22,13 @@ function WGLItemsDB.IsAppropriate(item, class)
     -- Is this an armor type?
     local isArmor = itemclass == Enum.ItemClass.Armor
 
-    -- Also get the player's specialization
-    local specID = GetSpecializationInfo(GetSpecialization())
-    local spec = GetSpecByNumber(specID)
+    -- Use an explicitly supplied inspected specialization for other players.
+    -- Existing callers still fall back to the local player's specialization.
+    if not specID and class == playerclass then
+        local specialization = GetSpecialization()
+        specID = specialization and GetSpecializationInfo(specialization) or nil
+    end
+    local spec = specID and GetSpecByNumber(specID) or nil
 
     if ClassAndGearDB.ALL[itemclass] ~= nil and ClassAndGearDB.ALL[itemclass][itemsubclass] ~= nil then
         return ClassAndGearDB.ALL[itemclass][itemsubclass]
@@ -35,7 +39,7 @@ function WGLItemsDB.IsAppropriate(item, class)
             return ClassAndGearDB[class]["armor"][itemsubclass]
         end
     else
-        if ClassAndGearDB[class][spec] ~= nil and ClassAndGearDB[class][spec][itemsubclass] ~= nil then
+        if spec and ClassAndGearDB[class][spec] ~= nil and ClassAndGearDB[class][spec][itemsubclass] ~= nil then
             return ClassAndGearDB[class][spec][itemsubclass]
         end
     end
@@ -110,7 +114,7 @@ class_specs = {
         Frost = 64,
     },
     WARLOCK = {
-        Affliction = 256,
+        Affliction = 265,
         Demonology = 266,
         Destruction = 267,
     },
@@ -541,7 +545,7 @@ ClassAndGearDB = {
             [Enum.ItemArmorSubclass.Leather] = false,
             [Enum.ItemArmorSubclass.Cloth] = false,
         },
-        Devestation = {
+        Devastation = {
             [Enum.ItemWeaponSubclass.Dagger] = true,
             [Enum.ItemWeaponSubclass.Unarmed] = true,
             [Enum.ItemWeaponSubclass.Axe1H] = true,

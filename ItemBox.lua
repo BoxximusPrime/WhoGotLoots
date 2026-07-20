@@ -31,7 +31,6 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame:SetWidth(270)
     ItemFrame:SetHeight(48)
     ItemFrame:SetClipsChildren(true)
-    WhoGotLootsFrames[#WhoGotLootsFrames + 1] = ItemFrame
 
     -- Create a few variables we'll need later.
     ItemFrame.Item = nil
@@ -39,6 +38,7 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame.Animating = false
     ItemFrame.HoverAnimDelta = nil
     ItemFrame.Lifetime = WhoLootFrameData.FrameLifetime
+    ItemFrame.Generation = 0
 
     -- Add a property to track if item is an upgrade
     ItemFrame.IsUpgrade = false
@@ -152,8 +152,16 @@ function WGL_FrameManager:CreateFrame()
     ItemFrame:SetScript("OnEnter", function(self) WhoLootData.HoverFrame(self, true); self:HoverOver(); end)
     ItemFrame:SetScript("OnLeave", function(self) WhoLootData.HoverFrame(self, false); self:HoverOut(); end)
 
+    function ItemFrame:CancelQueuedRequest()
+        if self.QueuedRequest and WGLCache then
+            WGLCache.CancelRequest(self.QueuedRequest)
+        end
+        self.QueuedRequest = nil
+    end
+
     function  ItemFrame.Close:CloseFrame()
         PlaySound(856)
+        self.ParentFrame:CancelQueuedRequest()
         self.ParentFrame:Hide()
         self.ParentFrame.InUse = false
 
@@ -201,7 +209,10 @@ function WGL_FrameManager:CreateFrame()
 
     -- Animation/visual controls
     function ItemFrame:Reset()
+        self:CancelQueuedRequest()
+        self.Generation = self.Generation + 1
         self:SetAlpha(1)
+        WGLUIBuilder.ColorBGSlicedFrame(self.border, "border", unpack(WhoLootFrameData.BorderColor))
         self.Icon:ClearAllPoints()
         self.Icon:SetPoint("TOPLEFT", WhoLootFrameData.IconAnimPosLeft[1], WhoLootFrameData.IconAnimPosTop[1])
         self.Icon:SetAlpha(1)
@@ -209,6 +220,7 @@ function WGL_FrameManager:CreateFrame()
         self.HoverAnimDelta = nil
         self.Lifetime = WhoLootFrameData.FrameLifetime
         self.InUse = false
+        self.IsUpgrade = false
         self.QueuedRequest = nil
         self:UpdateStatBreakdownVisibility()
     end
@@ -268,6 +280,7 @@ function WGL_FrameManager:CreateFrame()
     end
 
     function ItemFrame:FadeOut()
+        self:CancelQueuedRequest()
         self.Animating = true
         self:SetScript("OnUpdate", function(self, elapsed)
             self:SetAlpha(WGLU.Clamp(self:GetAlpha() - elapsed * 2, 0, 1))

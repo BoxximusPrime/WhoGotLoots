@@ -21,24 +21,28 @@ function WhoLootsOptionsEntries.LoadOptions()
     if WhoGotLootsSavedData.AutoCloseOnEmpty == nil then WhoGotLootsSavedData.AutoCloseOnEmpty = true end
     if WhoGotLootsSavedData.LockWindow == nil then WhoGotLootsSavedData.LockWindow = false end
     if WhoGotLootsSavedData.HideUnequippable == nil then WhoGotLootsSavedData.HideUnequippable = false end
+    if WhoGotLootsSavedData.ProtectActiveHeirlooms == nil then WhoGotLootsSavedData.ProtectActiveHeirlooms = true end
     if WhoGotLootsSavedData.SavedSize == nil then WhoGotLootsSavedData.SavedSize = 1 end
     if WhoGotLootsSavedData.SoundEnabled == nil then WhoGotLootsSavedData.SoundEnabled = true end
     if WhoGotLootsSavedData.ShowOwnLoot == nil then WhoGotLootsSavedData.ShowOwnLoot = true end
     if WhoGotLootsSavedData.ShowDuringRaid == nil then WhoGotLootsSavedData.ShowDuringRaid = true end
     if WhoGotLootsSavedData.ShowDuringLFR == nil then WhoGotLootsSavedData.ShowDuringLFR = false end
     if WhoGotLootsSavedData.MinQuality == nil then WhoGotLootsSavedData.MinQuality = 3 end
+    if WhoGotLootsSavedData.ShowUpgradesBelowMinQuality == nil then WhoGotLootsSavedData.ShowUpgradesBelowMinQuality = true end
     if WhoGotLootsSavedData.HideStatBreakdown == nil then WhoGotLootsSavedData.HideStatBreakdown = false end
     if WhoGotLootsSavedData.HideItemComparison == nil then WhoGotLootsSavedData.HideItemComparison = false end
 
     WhoLootsOptionsEntries.AutoClose:SetChecked(WhoGotLootsSavedData.AutoCloseOnEmpty)
     WhoLootsOptionsEntries.LockWindow:SetChecked(WhoGotLootsSavedData.LockWindow)
     WhoLootsOptionsEntries.HideUnequippable:SetChecked(WhoGotLootsSavedData.HideUnequippable)
+    WhoLootsOptionsEntries.ProtectActiveHeirlooms:SetChecked(WhoGotLootsSavedData.ProtectActiveHeirlooms)
     WhoLootsOptionsEntries.SoundToggle:SetChecked(WhoGotLootsSavedData.SoundEnabled)
     WhoLootsOptionsEntries.ShowOwnLoot:SetChecked(WhoGotLootsSavedData.ShowOwnLoot)
     WhoLootsOptionsEntries.ScaleSlider:SetValue(WhoGotLootsSavedData.SavedSize)
     WhoLootsOptionsEntries.ShowDuringRaid:SetChecked(WhoGotLootsSavedData.ShowDuringRaid)
     WhoLootsOptionsEntries.ShowDuringLFR:SetChecked(WhoGotLootsSavedData.ShowDuringLFR)
     WhoLootsOptionsEntries.MinQualitySlider:SetValue(WhoGotLootsSavedData.MinQuality)
+    WhoLootsOptionsEntries.ShowUpgradesBelowMinQuality:SetChecked(WhoGotLootsSavedData.ShowUpgradesBelowMinQuality)
     WhoLootsOptionsEntries.HideStatBreakdown:SetChecked(WhoGotLootsSavedData.HideStatBreakdown)
     WhoLootsOptionsEntries.HideItemComparison:SetChecked(WhoGotLootsSavedData.HideItemComparison)
 
@@ -57,6 +61,13 @@ function WhoLootsOptionsEntries.LoadOptions()
     
     WhoLootsOptionsFrame.idontNeedPreview:SetText(WhoGotLootsSavedData.IDontNeedMessage)
     WGLUIBuilder.IDontNeedEditor.EditBox:SetText(WhoGotLootsSavedData.IDontNeedMessage)
+
+    if WhoGotLootsSavedData.OfferWhisperMessage == nil then
+        WhoGotLootsSavedData.OfferWhisperMessage = WGLUIBuilder.DefaultOfferWhisperMessage
+    end
+
+    WhoLootsOptionsFrame.offerWhisperPreview:SetText(WhoGotLootsSavedData.OfferWhisperMessage)
+    WGLUIBuilder.OfferWhisperEditor.EditBox:SetText(WhoGotLootsSavedData.OfferWhisperMessage)
 
     -- Set the minimum item quality text color
     local r, g, b, hex = C_Item.GetItemQualityColor(WhoGotLootsSavedData.MinQuality)
@@ -187,13 +198,33 @@ idontNeedMessageBtn:SetScript("OnClick", function(self)
     PlaySound(170827)
 end)
 
+-- Create an editor entry for whispering a party member about our own item.
+local offerWhisperTitle = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_Checkbox")
+offerWhisperTitle:SetPoint("TOPLEFT", idontNeedMessageBtn, "BOTTOMLEFT", 0, -16)
+offerWhisperTitle:SetText("Offer Item Whisper")
+
+WhoLootsOptionsFrame.offerWhisperPreview = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+WhoLootsOptionsFrame.offerWhisperPreview:SetPoint("TOPLEFT", offerWhisperTitle, "BOTTOMLEFT", 0, -6)
+WhoLootsOptionsFrame.offerWhisperPreview:SetText(WGLUIBuilder.DefaultOfferWhisperMessage)
+WhoLootsOptionsFrame.offerWhisperPreview:SetJustifyH("LEFT")
+WhoLootsOptionsFrame.offerWhisperPreview:SetWidth(scrollFrame:GetWidth() - 20)
+
+local offerWhisperMessageBtn = CreateFrame("Button", nil, contentFrame, "WGLGeneralButton")
+offerWhisperMessageBtn:SetText("Set Offer Message")
+offerWhisperMessageBtn:SetPoint("TOPLEFT", WhoLootsOptionsFrame.offerWhisperPreview, "BOTTOMLEFT", 0, -6)
+offerWhisperMessageBtn:SetSize(110, 16)
+offerWhisperMessageBtn:SetScript("OnClick", function()
+    WGLUIBuilder.OfferWhisperEditor:Show()
+    PlaySound(170827)
+end)
+
 
 -- Checkbox: Auto Close Window
 local autoClose = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(autoClose, function(self) local tick = self:GetChecked(); WhoGotLootsSavedData.AutoCloseOnEmpty = tick; end)
 autoClose:SetText("Auto Close")
 autoClose:SetParent(contentFrame)
-autoClose:SetPoint("TOPLEFT", idontNeedMessageBtn, "BOTTOMLEFT", 0, -16)
+autoClose:SetPoint("TOPLEFT", offerWhisperMessageBtn, "BOTTOMLEFT", 0, -16)
 WhoLootsOptionsEntries.AutoClose = autoClose
 -- Option text
 local autoClose_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
@@ -242,10 +273,27 @@ hideUnequippable_Desc:SetPoint("TOPLEFT", HideUnequippable, "BOTTOMLEFT", 15, -8
 hideUnequippable_Desc:SetText("Hides items that cannot be equipped.")
 hideUnequippable_Desc:SetParent(contentFrame)
 
+-- Checkbox: Protect Active Heirlooms
+local ProtectActiveHeirlooms = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
+WGLUIBuilder.AddOnClick(ProtectActiveHeirlooms, function(self)
+    WhoGotLootsSavedData.ProtectActiveHeirlooms = self:GetChecked()
+end)
+ProtectActiveHeirlooms.Label:SetText("Protect Active Heirlooms")
+ProtectActiveHeirlooms:SetPoint("TOPLEFT", hideUnequippable_Desc, "BOTTOMLEFT", -15, -16)
+ProtectActiveHeirlooms:SetParent(contentFrame)
+WhoLootsOptionsEntries.ProtectActiveHeirlooms = ProtectActiveHeirlooms
+-- Option text
+local protectActiveHeirlooms_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+protectActiveHeirlooms_Desc:SetPoint("TOPLEFT", ProtectActiveHeirlooms, "BOTTOMLEFT", 15, -8)
+protectActiveHeirlooms_Desc:SetWidth(145)
+protectActiveHeirlooms_Desc:SetJustifyH("LEFT")
+protectActiveHeirlooms_Desc:SetText("Don't mark loot as an upgrade while your equipped heirloom still scales with your level.")
+protectActiveHeirlooms_Desc:SetParent(contentFrame)
+
 -- Slider: Set the minimum item quality (between 1, and 5)
 -- Create the label text.
 local minQualityLabel = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_Checkbox")
-minQualityLabel:SetPoint("TOPLEFT", hideUnequippable_Desc, "BOTTOMLEFT", -10, -20)
+minQualityLabel:SetPoint("TOPLEFT", protectActiveHeirlooms_Desc, "BOTTOMLEFT", -10, -20)
 minQualityLabel:SetText("Minimum Item Quality")
 minQualityLabel:SetParent(contentFrame)
 
@@ -273,6 +321,23 @@ end)
 
 WhoLootsOptionsEntries.MinQualitySlider = minQualitySlider
 
+-- Checkbox: Allow upgrades to bypass the minimum quality filter
+local ShowUpgradesBelowMinQuality = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
+WGLUIBuilder.AddOnClick(ShowUpgradesBelowMinQuality, function(self)
+    WhoGotLootsSavedData.ShowUpgradesBelowMinQuality = self:GetChecked()
+end)
+ShowUpgradesBelowMinQuality.Label:SetText("Show Lower-Quality Upgrades")
+ShowUpgradesBelowMinQuality:SetPoint("TOPLEFT", minQualitySlider, "BOTTOMLEFT", 0, -28)
+ShowUpgradesBelowMinQuality:SetParent(contentFrame)
+WhoLootsOptionsEntries.ShowUpgradesBelowMinQuality = ShowUpgradesBelowMinQuality
+
+local showUpgradesBelowMinQuality_Desc = contentFrame:CreateFontString(nil, "ARTWORK", "WGLFont_General")
+showUpgradesBelowMinQuality_Desc:SetPoint("TOPLEFT", ShowUpgradesBelowMinQuality, "BOTTOMLEFT", 15, -8)
+showUpgradesBelowMinQuality_Desc:SetWidth(145)
+showUpgradesBelowMinQuality_Desc:SetJustifyH("LEFT")
+showUpgradesBelowMinQuality_Desc:SetText("Show items below the minimum quality when they are an upgrade for you.")
+showUpgradesBelowMinQuality_Desc:SetParent(contentFrame)
+
 -- Checkbox: Hide Stat Breakdown
 local HideStatBreakdown = CreateFrame("Button", nil, contentFrame, "WGLCheckBoxTemplate")
 WGLUIBuilder.AddOnClick(HideStatBreakdown, function(self) 
@@ -281,7 +346,7 @@ WGLUIBuilder.AddOnClick(HideStatBreakdown, function(self)
     WGL_FrameManager:UpdateAllFramesStatBreakdownVisibility()
 end)
 HideStatBreakdown.Label:SetText("Hide Stat Breakdown")
-HideStatBreakdown:SetPoint("TOPLEFT", minQualitySlider, "BOTTOMLEFT", 0, -28)
+HideStatBreakdown:SetPoint("TOPLEFT", showUpgradesBelowMinQuality_Desc, "BOTTOMLEFT", -15, -16)
 HideStatBreakdown:SetParent(contentFrame)
 WhoLootsOptionsEntries.HideStatBreakdown = HideStatBreakdown
 -- Option text
@@ -363,7 +428,7 @@ scaleSlider.KeyLabel2:SetText("2.0")
 
 
 -- Now, set the content frame size
-contentFrame:SetSize(260, 480)
+contentFrame:SetSize(260, 700)
 
 -- Show the version number at the bottom right of the options frame.
 local version = WhoLootsOptionsFrame:CreateFontString(nil, "ARTWORK", "WGLFont_VersNum")
@@ -379,6 +444,7 @@ scaleSlider:SetScript("OnMouseUp", function(self, button)
     WhoLootData.MainFrame.cursorFrame:SetScale(value)
     WGLUIBuilder.WhisperEditor:SetScale(value)
     WGLUIBuilder.IDontNeedEditor:SetScale(value)
+    WGLUIBuilder.OfferWhisperEditor:SetScale(value)
 end)
 WhoLootsOptionsEntries.ScaleSlider = scaleSlider
 

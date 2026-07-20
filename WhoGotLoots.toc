@@ -1,8 +1,8 @@
-## Interface: 110002, 120000
+## Interface: 120007
 
 ## Title: Who Got Loots
 ## Notes: Tracks and displays looted items
-
+## Version: 1.8.1
 ## SavedVariables: WhoGotLootsSavedData
 
 Art\Fonts.xml
@@ -13,5 +13,6 @@ util.lua
 UIBuilder.lua
 ItemBox.lua
 CacheHandler.lua
+GroupUpgradeFrame.lua
 WhoGotLoots.lua
 OptionsMenu.lua
